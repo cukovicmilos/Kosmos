@@ -1,0 +1,138 @@
+# English translations for Kosmos Telegram Bot
+# Language: English (en)
+
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: en\n"
+
+# Welcome and start messages
+msgid "welcome_message"
+msgstr "Welcome to Kosmos! 🚀\n\nI'm your personal reminder bot. I'll help you remember important things.\n\nTo create a reminder, just send me a message like:\n• Coffee tomorrow 14:00\n• Meeting mon 10:00\n• Call John 18:30\n\nUse /help to see all available commands."
+
+msgid "welcome_back"
+msgstr "Welcome back! 👋"
+
+msgid "timezone_question"
+msgstr "I couldn't detect your timezone. Please select your timezone:"
+
+msgid "timezone_selected"
+msgstr "Timezone set to: {timezone}"
+
+# Commands help
+msgid "help_message"
+msgstr "📖 *Kosmos Help*\n\n*Creating reminders:*\nSend a message with text and time:\n• `Reminder text tomorrow 16:00`\n• `Reminder text mon 10:00`\n• `Reminder text 14:30`\n\n*Supported time formats:*\n• Days: tomorrow, dat (day after tomorrow), mon/tue/wed/thu/fri/sat/sun\n• Time: 21:00, 8, 7am, 2100, etc.\n\n*Commands:*\n/list - View all upcoming reminders\n/settings - Change language, time format, timezone\n/help - Show this help message\n\n*Quick actions:*\nUse the 'List' and 'New Reminder' buttons below for quick access."
+
+msgid "new_reminder_prompt"
+msgstr "📝 To create a reminder, send me a message in this format:\n\n`[Your reminder text] [day] [time]`\n\n*Examples:*\n• Take fishing rod to the lake tomorrow 16:00\n• Meeting mon 10:00\n• Coffee 14:30"
+
+# Reminder creation
+msgid "reminder_created"
+msgstr "Recorded ✓"
+
+msgid "reminder_parse_error"
+msgstr "I couldn't understand the time format. Please try again:\n\n`[Message] [day] [time]`\n\n*Examples:*\n• Take fishing rod tomorrow 16:00\n• Meeting mon 10:00\n• Coffee 14:30"
+
+# Reminder notifications
+msgid "reminder_notification"
+msgstr "🔔 *Reminder:*\n\n{message}"
+
+msgid "reminder_postponed"
+msgstr "Reminder postponed ✓"
+
+msgid "custom_time_prompt"
+msgstr "Enter new time (e.g., 19:00 or tue 19:00):"
+
+msgid "postpone_15m"
+msgstr "15 min"
+
+msgid "postpone_30m"
+msgstr "30 min"
+
+msgid "postpone_1h"
+msgstr "1 hour"
+
+msgid "postpone_3h"
+msgstr "3 hours"
+
+msgid "postpone_1d"
+msgstr "1 day"
+
+msgid "postpone_custom"
+msgstr "Custom time"
+
+# List reminders
+msgid "list_empty"
+msgstr "You have no upcoming reminders.\n\nCreate one by sending me a message!"
+
+msgid "list_header"
+msgstr "📝 *Your reminders:*\n"
+
+msgid "reminder_item"
+msgstr "{index}. {message}\n📅 {date} at {time}"
+
+msgid "delete_button"
+msgstr "Delete"
+
+msgid "reminder_deleted"
+msgstr "Reminder deleted ✓"
+
+# Settings
+msgid "settings_menu"
+msgstr "⚙️ *Settings*\n\nCurrent settings:\n• Language: {language}\n• Time format: {time_format}\n• Timezone: {timezone}\n\nWhat would you like to change?"
+
+msgid "settings_language"
+msgstr "🌐 Language"
+
+msgid "settings_time_format"
+msgstr "🕐 Time format"
+
+msgid "settings_timezone"
+msgstr "🌍 Timezone"
+
+msgid "settings_back"
+msgstr "← Back"
+
+msgid "language_changed"
+msgstr "Language changed to English ✓"
+
+msgid "time_format_changed"
+msgstr "Time format changed to: {format}"
+
+msgid "timezone_changed"
+msgstr "Timezone changed to: {timezone}"
+
+msgid "select_language"
+msgstr "Select your language:"
+
+msgid "select_time_format"
+msgstr "Select time format:"
+
+msgid "select_timezone"
+msgstr "Select your timezone:"
+
+msgid "language_english"
+msgstr "🇬🇧 English"
+
+msgid "language_serbian"
+msgstr "🇷🇸 Srpski"
+
+msgid "time_format_12h"
+msgstr "12-hour (AM/PM)"
+
+msgid "time_format_24h"
+msgstr "24-hour"
+
+# Common
+msgid "error_occurred"
+msgstr "An error occurred. Please try again."
+
+msgid "invalid_command"
+msgstr "Invalid command. Use /help to see available commands."
+
+# Bot menu
+msgid "menu_list"
+msgstr "List"
+
+msgid "menu_new_reminder"
+msgstr "New Reminder"

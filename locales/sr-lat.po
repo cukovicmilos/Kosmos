@@ -1,0 +1,138 @@
+# Serbian (Latin) translations for Kosmos Telegram Bot
+# Language: Serbian Latin (sr-lat)
+
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: sr-lat\n"
+
+# Welcome and start messages
+msgid "welcome_message"
+msgstr "Dobrodošao u Kosmos! 🚀\n\nJa sam tvoj lični podsetnik. Pomažu ti da zapamtiš važne stvari.\n\nDa kreiraš podsetnik, samo mi pošalji poruku kao:\n• Kafa sutra 14:00\n• Sastanak pon 10:00\n• Pozovi Jovana 18:30\n\nKoristi /help da vidiš sve dostupne komande."
+
+msgid "welcome_back"
+msgstr "Dobrodošao nazad! 👋"
+
+msgid "timezone_question"
+msgstr "Nisam mogao da detektujem tvoju vremensku zonu. Molim te izaberi vremensku zonu:"
+
+msgid "timezone_selected"
+msgstr "Vremenska zona podešena na: {timezone}"
+
+# Commands help
+msgid "help_message"
+msgstr "📖 *Kosmos Pomoć*\n\n*Kreiranje podsetnika:*\nPošalji poruku sa tekstom i vremenom:\n• `Tekst podsetnika sutra 16:00`\n• `Tekst podsetnika pon 10:00`\n• `Tekst podsetnika 14:30`\n\n*Podržani formati vremena:*\n• Dani: sutra, prekosutra, pon/uto/sre/cet/pet/sub/ned\n• Vreme: 21:00, 8, 7am, 2100, itd.\n\n*Komande:*\n/list - Prikaži sve podsetnike u budućnosti\n/settings - Promeni jezik, format vremena, vremensku zonu\n/help - Prikaži ovu pomoć\n\n*Brze akcije:*\nKoristi dugmad 'List' i 'New Reminder' ispod za brzi pristup."
+
+msgid "new_reminder_prompt"
+msgstr "📝 Da kreiraš podsetnik, pošalji mi poruku u ovom formatu:\n\n`[Tvoj tekst podsetnika] [dan] [vreme]`\n\n*Primeri:*\n• Ponesi pecaljku na jezero sutra 16:00\n• Sastanak pon 10:00\n• Kafa 14:30"
+
+# Reminder creation
+msgid "reminder_created"
+msgstr "Zabeleženo ✓"
+
+msgid "reminder_parse_error"
+msgstr "Nisam razumeo format vremena. Pokušaj ponovo:\n\n`[Poruka] [dan] [vreme]`\n\n*Primeri:*\n• Ponesi pecaljku sutra 16:00\n• Sastanak pon 10:00\n• Kafa 14:30"
+
+# Reminder notifications
+msgid "reminder_notification"
+msgstr "🔔 *Podsetnik:*\n\n{message}"
+
+msgid "reminder_postponed"
+msgstr "Podsetnik odložen ✓"
+
+msgid "custom_time_prompt"
+msgstr "Unesi novo vreme (npr. 19:00 ili uto 19:00):"
+
+msgid "postpone_15m"
+msgstr "15 min"
+
+msgid "postpone_30m"
+msgstr "30 min"
+
+msgid "postpone_1h"
+msgstr "1 sat"
+
+msgid "postpone_3h"
+msgstr "3 sata"
+
+msgid "postpone_1d"
+msgstr "1 dan"
+
+msgid "postpone_custom"
+msgstr "Drugo vreme"
+
+# List reminders
+msgid "list_empty"
+msgstr "Nemaš nadolazeće podsetnike.\n\nKreiraj jedan tako što ćeš mi poslati poruku!"
+
+msgid "list_header"
+msgstr "📝 *Tvoji podsetnici:*\n"
+
+msgid "reminder_item"
+msgstr "{index}. {message}\n📅 {date} u {time}"
+
+msgid "delete_button"
+msgstr "Obriši"
+
+msgid "reminder_deleted"
+msgstr "Podsetnik obrisan ✓"
+
+# Settings
+msgid "settings_menu"
+msgstr "⚙️ *Podešavanja*\n\nTrenutna podešavanja:\n• Jezik: {language}\n• Format vremena: {time_format}\n• Vremenska zona: {timezone}\n\nŠta želiš da promeniš?"
+
+msgid "settings_language"
+msgstr "🌐 Jezik"
+
+msgid "settings_time_format"
+msgstr "🕐 Format vremena"
+
+msgid "settings_timezone"
+msgstr "🌍 Vremenska zona"
+
+msgid "settings_back"
+msgstr "← Nazad"
+
+msgid "language_changed"
+msgstr "Jezik promenjen na Srpski ✓"
+
+msgid "time_format_changed"
+msgstr "Format vremena promenjen na: {format}"
+
+msgid "timezone_changed"
+msgstr "Vremenska zona promenjena na: {timezone}"
+
+msgid "select_language"
+msgstr "Izaberi jezik:"
+
+msgid "select_time_format"
+msgstr "Izaberi format vremena:"
+
+msgid "select_timezone"
+msgstr "Izaberi vremensku zonu:"
+
+msgid "language_english"
+msgstr "🇬🇧 English"
+
+msgid "language_serbian"
+msgstr "🇷🇸 Srpski"
+
+msgid "time_format_12h"
+msgstr "12-časovni (AM/PM)"
+
+msgid "time_format_24h"
+msgstr "24-časovni"
+
+# Common
+msgid "error_occurred"
+msgstr "Došlo je do greške. Pokušaj ponovo."
+
+msgid "invalid_command"
+msgstr "Nepoznata komanda. Koristi /help da vidiš dostupne komande."
+
+# Bot menu
+msgid "menu_list"
+msgstr "Lista"
+
+msgid "menu_new_reminder"
+msgstr "Novi podsetnik"
