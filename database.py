@@ -256,13 +256,15 @@ def get_pending_reminders() -> List[Dict[str, Any]]:
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
+            # Use datetime.now() to get local time, which matches how scheduled_time is stored
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             cursor.execute("""
                 SELECT r.*, u.timezone
                 FROM reminders r
                 JOIN users u ON r.user_id = u.telegram_id
-                WHERE r.status = 'pending' AND r.scheduled_time <= ?
+                WHERE r.status = 'pending' AND datetime(r.scheduled_time) <= datetime(?)
                 ORDER BY r.scheduled_time ASC
-            """, (datetime.utcnow(),))
+            """, (current_time,))
 
             rows = cursor.fetchall()
             return [dict(row) for row in rows]

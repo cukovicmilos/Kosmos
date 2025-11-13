@@ -267,9 +267,13 @@ def parse_reminder(message: str, user_timezone: str = "Europe/Belgrade") -> Opti
         if day_offset == 0 and scheduled_dt <= now:
             scheduled_dt += timedelta(days=1)
 
+    # Remove timezone info to store as local time in database
+    # SQLite will convert timezone-aware datetimes to UTC, which we don't want
+    scheduled_dt_naive = scheduled_dt.replace(tzinfo=None)
+
     logger.info(f"Parsed reminder: '{reminder_text}' at {scheduled_dt}")
 
-    return (reminder_text.strip(), scheduled_dt)
+    return (reminder_text.strip(), scheduled_dt_naive)
 
 
 def format_datetime(dt: datetime, language: str = "en", time_format: str = "24h") -> str:
