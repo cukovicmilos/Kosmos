@@ -49,6 +49,9 @@ msgstr "⏰ Reminder postponed to {time}"
 msgid "custom_time_prompt"
 msgstr "Enter new time (e.g., 19:00 or tue 19:00):"
 
+msgid "custom_time_parse_error"
+msgstr "Invalid time format. Please enter:\n\n• Just time: `19:00` or `7pm`\n• With day: `tue 19:00` or `tomorrow 14:00`"
+
 msgid "postpone_15m"
 msgstr "15 min"
 
@@ -85,7 +88,7 @@ msgstr "Reminder deleted ✓"
 
 # Settings
 msgid "settings_menu"
-msgstr "⚙️ *Settings*\n\nCurrent settings:\n• Language: {language}\n• Time format: {time_format}\n• Timezone: {timezone}\n\nWhat would you like to change?"
+msgstr "⚙️ *Settings*\n\nCurrent settings:\n• Language: {lang_name}\n• Time format: {time_format}\n• Timezone: {timezone}\n\nWhat would you like to change?"
 
 msgid "settings_language"
 msgstr "🌐 Language"

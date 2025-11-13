@@ -4,6 +4,7 @@ Processes user messages to create reminders.
 """
 
 import logging
+from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 
@@ -39,6 +40,7 @@ async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_
 
     user_lang = user.get("language", "en")
     user_timezone = user.get("timezone", "Europe/Belgrade")
+    user_time_format = user.get("time_format", "24h")
 
     # Try to parse the message as a reminder
     try:
@@ -63,10 +65,28 @@ async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_
         )
 
         if reminder_id:
-            # Success - send confirmation
-            await update.message.reply_text(
-                get_text("reminder_created", user_lang)
-            )
+            # Success - send confirmation with time
+            # Check if scheduled time is today
+            now_date = datetime.now().date()
+            scheduled_date = scheduled_time.date()
+
+            if now_date == scheduled_date:
+                # Today - show only time
+                if user_time_format == "12h":
+                    time_str = scheduled_time.strftime("%I:%M %p")
+                else:
+                    time_str = scheduled_time.strftime("%H:%M")
+                confirmation_msg = f"✓ {reminder_text} > {time_str}"
+            else:
+                # Another day - show date and time
+                date_str = scheduled_time.strftime("%d.%m.%Y.")
+                if user_time_format == "12h":
+                    time_str = scheduled_time.strftime("%I:%M %p")
+                else:
+                    time_str = scheduled_time.strftime("%H:%M")
+                confirmation_msg = f"✓ {reminder_text} > {date_str} {time_str}"
+
+            await update.message.reply_text(confirmation_msg)
             logger.info(
                 f"Reminder created: ID={reminder_id}, user={user_id}, "
                 f"time={scheduled_time}, text='{reminder_text}'"

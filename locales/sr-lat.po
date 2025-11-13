@@ -49,6 +49,9 @@ msgstr "⏰ Podsetnik odložen za {time}"
 msgid "custom_time_prompt"
 msgstr "Unesi novo vreme (npr. 19:00 ili uto 19:00):"
 
+msgid "custom_time_parse_error"
+msgstr "Neispravan format vremena. Unesi:\n\n• Samo vreme: `19:00` ili `7pm`\n• Sa danom: `uto 19:00` ili `sutra 14:00`"
+
 msgid "postpone_15m"
 msgstr "15 min"
 
@@ -85,7 +88,7 @@ msgstr "Podsetnik obrisan ✓"
 
 # Settings
 msgid "settings_menu"
-msgstr "⚙️ *Podešavanja*\n\nTrenutna podešavanja:\n• Jezik: {language}\n• Format vremena: {time_format}\n• Vremenska zona: {timezone}\n\nŠta želiš da promeniš?"
+msgstr "⚙️ *Podešavanja*\n\nTrenutna podešavanja:\n• Jezik: {lang_name}\n• Format vremena: {time_format}\n• Vremenska zona: {timezone}\n\nŠta želiš da promeniš?"
 
 msgid "settings_language"
 msgstr "🌐 Jezik"

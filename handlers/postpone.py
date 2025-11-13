@@ -178,7 +178,7 @@ async def custom_time_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         if not result:
             # Parsing failed
             await update.message.reply_text(
-                get_text("reminder_parse_error", user_lang),
+                get_text("custom_time_parse_error", user_lang),
                 parse_mode="Markdown"
             )
             return WAITING_CUSTOM_TIME
@@ -244,11 +244,26 @@ def register_handlers(application):
     """
     from telegram.ext import CallbackQueryHandler, ConversationHandler, MessageHandler, filters
 
-    # Register callback query handler for postpone buttons
+    # Register callback query handler for postpone buttons (non-custom durations)
     application.add_handler(
-        CallbackQueryHandler(postpone_callback, pattern="^postpone_")
+        CallbackQueryHandler(postpone_callback, pattern="^postpone_.*(?<!custom)$")
     )
 
-    # Note: ConversationHandler for custom time would need more complex setup
-    # For now, we'll use a simpler approach with the callback handler
-    # In a production app, you'd want to use ConversationHandler properly
+    # Register ConversationHandler for custom time postpone
+    custom_time_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(postpone_callback, pattern="^postpone_.*_custom$")
+        ],
+        states={
+            WAITING_CUSTOM_TIME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, custom_time_message)
+            ]
+        },
+        fallbacks=[
+            # If user sends a command or cancels, end conversation
+        ],
+        per_chat=True,
+        per_user=True,
+        per_message=False,
+    )
+    application.add_handler(custom_time_handler)

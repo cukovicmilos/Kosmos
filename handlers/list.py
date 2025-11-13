@@ -53,6 +53,7 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tz = pytz.timezone(user_timezone)
 
     for index, reminder in enumerate(reminders, 1):
+        reminder_id = reminder['id']
         reminder_text = reminder['message_text']
         scheduled_time_str = reminder['scheduled_time']
 
@@ -81,21 +82,22 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 time_str = scheduled_dt_local.strftime("%H:%M")
 
-            # Add to message
+            # Add to message - use index for display, but keep database ID for deletion
             separator = "u" if user_lang == "sr-lat" else "at"
             message_text += f"\n{index}. {reminder_text}\n"
-            message_text += f"   📅 {date_str} {separator} {time_str}\n"
+            message_text += f"   {date_str} {separator} {time_str}\n"
 
         except Exception as e:
             logger.error(f"Error formatting reminder {reminder['id']}: {e}", exc_info=True)
             message_text += f"\n{index}. {reminder_text}\n"
-            message_text += f"   📅 {scheduled_time_str}\n"
+            message_text += f"   {scheduled_time_str}\n"
 
     # Create inline keyboard with Delete buttons
+    # Use index (1, 2, 3...) in button text, but database ID in callback_data
     keyboard = []
-    for reminder in reminders:
+    for index, reminder in enumerate(reminders, 1):
         button = InlineKeyboardButton(
-            f"🗑️ Obriši #{reminder['id']}" if user_lang == "sr-lat" else f"🗑️ Delete #{reminder['id']}",
+            f"🗑️ Obriši #{index}" if user_lang == "sr-lat" else f"🗑️ Delete #{index}",
             callback_data=f"delete_{reminder['id']}"
         )
         keyboard.append([button])
@@ -168,6 +170,7 @@ async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tz = pytz.timezone(user_timezone)
 
         for index, reminder in enumerate(reminders, 1):
+            reminder_id = reminder['id']
             reminder_text = reminder['message_text']
             scheduled_time_str = reminder['scheduled_time']
 
@@ -194,18 +197,18 @@ async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 separator = "u" if user_lang == "sr-lat" else "at"
                 message_text += f"\n{index}. {reminder_text}\n"
-                message_text += f"   📅 {date_str} {separator} {time_str}\n"
+                message_text += f"   {date_str} {separator} {time_str}\n"
 
             except Exception as e:
                 logger.error(f"Error formatting reminder {reminder['id']}: {e}", exc_info=True)
                 message_text += f"\n{index}. {reminder_text}\n"
-                message_text += f"   📅 {scheduled_time_str}\n"
+                message_text += f"   {scheduled_time_str}\n"
 
-        # Rebuild keyboard
+        # Rebuild keyboard - use index for button text, database ID for callback
         keyboard = []
-        for reminder in reminders:
+        for index, reminder in enumerate(reminders, 1):
             button = InlineKeyboardButton(
-                f"🗑️ Obriši #{reminder['id']}" if user_lang == "sr-lat" else f"🗑️ Delete #{reminder['id']}",
+                f"🗑️ Obriši #{index}" if user_lang == "sr-lat" else f"🗑️ Delete #{index}",
                 callback_data=f"delete_{reminder['id']}"
             )
             keyboard.append([button])

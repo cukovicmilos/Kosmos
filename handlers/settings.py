@@ -38,7 +38,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Build settings message
     message_text = get_text("settings_menu", user_lang,
-                           language=lang_display,
+                           lang_name=lang_display,
                            time_format=time_format_display,
                            timezone=user_timezone)
 
@@ -307,7 +307,7 @@ async def settings_command_callback(query, user_id):
     time_format_display = "AM/PM" if user_time_format == "12h" else "24h"
 
     message_text = get_text("settings_menu", user_lang,
-                           language=lang_display,
+                           lang_name=lang_display,
                            time_format=time_format_display,
                            timezone=user_timezone)
 
