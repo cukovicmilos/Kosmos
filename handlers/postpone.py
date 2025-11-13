@@ -108,12 +108,30 @@ async def postpone_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass  # If message can't be edited, that's ok
 
         # Format the new time for display
-        formatted_time = format_datetime(new_time_naive, user_lang, user_time_format)
+        reminder_text = reminder['message_text']
+
+        # Check if new time is today
+        now_date = datetime.now().date()
+        new_time_date = new_time_naive.date()
+
+        if now_date == new_time_date:
+            # Today - show only time
+            if user_time_format == "12h":
+                time_str = new_time_naive.strftime("%I:%M %p")
+            else:
+                time_str = new_time_naive.strftime("%H:%M")
+            postpone_msg = f"⏰ {reminder_text} > {time_str}"
+        else:
+            # Another day - show date and time
+            date_str = new_time_naive.strftime("%d.%m.%Y.")
+            if user_time_format == "12h":
+                time_str = new_time_naive.strftime("%I:%M %p")
+            else:
+                time_str = new_time_naive.strftime("%H:%M")
+            postpone_msg = f"⏰ {reminder_text} > {date_str} {time_str}"
 
         # Send confirmation as a new message (don't edit the original)
-        await query.message.reply_text(
-            get_text("reminder_postponed_to", user_lang, time=formatted_time)
-        )
+        await query.message.reply_text(postpone_msg)
         logger.info(f"Reminder {reminder_id} postponed by {duration} to {new_time}")
     else:
         await query.edit_message_text(
@@ -172,11 +190,29 @@ async def custom_time_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         if success:
             # Format the new time for display
-            formatted_time = format_datetime(new_time, user_lang, user_time_format)
+            reminder_text = reminder['message_text']
 
-            await update.message.reply_text(
-                get_text("reminder_postponed_to", user_lang, time=formatted_time)
-            )
+            # Check if new time is today
+            now_date = datetime.now().date()
+            new_time_date = new_time.date()
+
+            if now_date == new_time_date:
+                # Today - show only time
+                if user_time_format == "12h":
+                    time_str = new_time.strftime("%I:%M %p")
+                else:
+                    time_str = new_time.strftime("%H:%M")
+                postpone_msg = f"⏰ {reminder_text} > {time_str}"
+            else:
+                # Another day - show date and time
+                date_str = new_time.strftime("%d.%m.%Y.")
+                if user_time_format == "12h":
+                    time_str = new_time.strftime("%I:%M %p")
+                else:
+                    time_str = new_time.strftime("%H:%M")
+                postpone_msg = f"⏰ {reminder_text} > {date_str} {time_str}"
+
+            await update.message.reply_text(postpone_msg)
             logger.info(f"Reminder {reminder_id} postponed to custom time {new_time}")
         else:
             await update.message.reply_text(
