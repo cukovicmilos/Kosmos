@@ -93,8 +93,11 @@ async def postpone_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     new_time = now + duration_map[duration]
 
+    # Remove timezone info to store as local time in database
+    new_time_naive = new_time.replace(tzinfo=None)
+
     # Update reminder in database
-    success = update_reminder_time(reminder_id, new_time)
+    success = update_reminder_time(reminder_id, new_time_naive)
 
     if success:
         await query.edit_message_text(

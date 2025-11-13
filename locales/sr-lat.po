@@ -19,6 +19,9 @@ msgstr "Nisam mogao da detektujem tvoju vremensku zonu. Molim te izaberi vremens
 msgid "timezone_selected"
 msgstr "Vremenska zona podešena na: {timezone}"
 
+msgid "ready_to_use"
+msgstr "Sve je spremno! 🎉\n\nKoristi dugmad ispod za brzi pristup, ili mi samo pošalji poruku da kreiraš podsetnik."
+
 # Commands help
 msgid "help_message"
 msgstr "📖 *Kosmos Pomoć*\n\n*Kreiranje podsetnika:*\nPošalji poruku sa tekstom i vremenom:\n• `Tekst podsetnika sutra 16:00`\n• `Tekst podsetnika pon 10:00`\n• `Tekst podsetnika 14:30`\n\n*Podržani formati vremena:*\n• Dani: sutra, prekosutra, pon/uto/sre/cet/pet/sub/ned\n• Vreme: 21:00, 8, 7am, 2100, itd.\n\n*Komande:*\n/list - Prikaži sve podsetnike u budućnosti\n/settings - Promeni jezik, format vremena, vremensku zonu\n/help - Prikaži ovu pomoć\n\n*Brze akcije:*\nKoristi dugmad 'List' i 'New Reminder' ispod za brzi pristup."

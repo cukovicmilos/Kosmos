@@ -19,6 +19,9 @@ msgstr "I couldn't detect your timezone. Please select your timezone:"
 msgid "timezone_selected"
 msgstr "Timezone set to: {timezone}"
 
+msgid "ready_to_use"
+msgstr "You're all set! 🎉\n\nUse the buttons below for quick access, or just send me a message to create a reminder."
+
 # Commands help
 msgid "help_message"
 msgstr "📖 *Kosmos Help*\n\n*Creating reminders:*\nSend a message with text and time:\n• `Reminder text tomorrow 16:00`\n• `Reminder text mon 10:00`\n• `Reminder text 14:30`\n\n*Supported time formats:*\n• Days: tomorrow, dat (day after tomorrow), mon/tue/wed/thu/fri/sat/sun\n• Time: 21:00, 8, 7am, 2100, etc.\n\n*Commands:*\n/list - View all upcoming reminders\n/settings - Change language, time format, timezone\n/help - Show this help message\n\n*Quick actions:*\nUse the 'List' and 'New Reminder' buttons below for quick access."

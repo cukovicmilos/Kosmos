@@ -56,24 +56,23 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reminder_text = reminder['message_text']
         scheduled_time_str = reminder['scheduled_time']
 
-        # Parse scheduled_time from database (stored as UTC string)
+        # Parse scheduled_time from database (stored as local time naive datetime)
         # SQLite stores datetime as string
         try:
             if isinstance(scheduled_time_str, str):
-                # Try parsing with timezone info
+                # Parse as naive datetime (no timezone)
                 try:
                     scheduled_dt = datetime.fromisoformat(scheduled_time_str)
                 except:
-                    # Try without timezone
                     scheduled_dt = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S")
-                    scheduled_dt = pytz.UTC.localize(scheduled_dt)
             else:
                 scheduled_dt = scheduled_time_str
 
-            # Convert to user's timezone
+            # If naive datetime, treat it as local time (already in correct timezone)
             if scheduled_dt.tzinfo is None:
-                scheduled_dt = pytz.UTC.localize(scheduled_dt)
-            scheduled_dt_local = scheduled_dt.astimezone(tz)
+                scheduled_dt_local = tz.localize(scheduled_dt)
+            else:
+                scheduled_dt_local = scheduled_dt.astimezone(tz)
 
             # Format date and time
             date_str = scheduled_dt_local.strftime("%d.%m.%Y.")
@@ -178,13 +177,14 @@ async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         scheduled_dt = datetime.fromisoformat(scheduled_time_str)
                     except:
                         scheduled_dt = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S")
-                        scheduled_dt = pytz.UTC.localize(scheduled_dt)
                 else:
                     scheduled_dt = scheduled_time_str
 
+                # If naive datetime, treat it as local time (already in correct timezone)
                 if scheduled_dt.tzinfo is None:
-                    scheduled_dt = pytz.UTC.localize(scheduled_dt)
-                scheduled_dt_local = scheduled_dt.astimezone(tz)
+                    scheduled_dt_local = tz.localize(scheduled_dt)
+                else:
+                    scheduled_dt_local = scheduled_dt.astimezone(tz)
 
                 date_str = scheduled_dt_local.strftime("%d.%m.%Y.")
                 if user_time_format == "12h":

@@ -4,14 +4,40 @@ Handles /start command and user initialization.
 """
 
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CallbackQueryHandler
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 import pytz
 
 from database import create_user, get_user
 from i18n import get_text
 
 logger = logging.getLogger(__name__)
+
+
+def get_main_keyboard(language: str = "en"):
+    """
+    Get the main reply keyboard with quick access buttons.
+
+    Args:
+        language: User's language preference
+
+    Returns:
+        ReplyKeyboardMarkup with persistent buttons
+    """
+    if language == "sr-lat":
+        keyboard = [
+            [KeyboardButton("📋 Lista"), KeyboardButton("⚙️ Podešavanja")],
+        ]
+    else:
+        keyboard = [
+            [KeyboardButton("📋 List"), KeyboardButton("⚙️ Settings")],
+        ]
+
+    return ReplyKeyboardMarkup(
+        keyboard,
+        resize_keyboard=True,
+        persistent=True
+    )
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -33,7 +59,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_lang = existing_user.get("language", "en")
         await update.message.reply_text(
             get_text("welcome_back", user_lang),
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=get_main_keyboard(user_lang)
         )
         logger.info(f"Existing user {telegram_id} returned")
     else:
@@ -146,11 +173,43 @@ async def timezone_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             get_text("timezone_selected", user_lang, timezone=timezone)
         )
+
+        # Send main keyboard
+        await query.message.reply_text(
+            get_text("ready_to_use", user_lang),
+            reply_markup=get_main_keyboard(user_lang)
+        )
+
         logger.info(f"User {user_id} selected timezone: {timezone}")
     else:
         await query.edit_message_text(
             get_text("error_occurred", "en")
         )
+
+
+async def handle_keyboard_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handle keyboard button presses (List, Settings, etc).
+    """
+    text = update.message.text
+    user_id = update.effective_user.id
+
+    # Get user language
+    user = get_user(user_id)
+    if not user:
+        return
+
+    user_lang = user.get("language", "en")
+
+    # Route to appropriate handler based on button text
+    if text in ["📋 List", "📋 Lista"]:
+        # Import list handler to avoid circular import
+        from . import list as list_handler
+        await list_handler.list_command(update, context)
+    elif text in ["⚙️ Settings", "⚙️ Podešavanja"]:
+        # Import settings handler to avoid circular import
+        from . import settings as settings_handler
+        await settings_handler.settings_command(update, context)
 
 
 def register_handlers(application):
@@ -161,3 +220,7 @@ def register_handlers(application):
 
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CallbackQueryHandler(timezone_callback, pattern="^tz_"))
+
+    # Handler for keyboard buttons - must be before generic text handler
+    keyboard_filter = filters.Regex("^(📋 List|📋 Lista|⚙️ Settings|⚙️ Podešavanja)$")
+    application.add_handler(MessageHandler(keyboard_filter, handle_keyboard_buttons))

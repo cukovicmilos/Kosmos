@@ -62,7 +62,7 @@ async def send_reminder(bot: Bot, reminder: dict):
     # But the database query already includes timezone from the JOIN
 
     # Format reminder notification message
-    notification_text = f"🔔 *Podsetnik:*\n\n{message_text}"
+    notification_text = f"🔔 {message_text}"
 
     # Create inline keyboard with postpone options
     keyboard = [
