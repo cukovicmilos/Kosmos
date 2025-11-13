@@ -43,6 +43,9 @@ msgstr "🔔 *Reminder:*\n\n{message}"
 msgid "reminder_postponed"
 msgstr "Reminder postponed ✓"
 
+msgid "reminder_postponed_to"
+msgstr "⏰ Reminder postponed to {time}"
+
 msgid "custom_time_prompt"
 msgstr "Enter new time (e.g., 19:00 or tue 19:00):"
 

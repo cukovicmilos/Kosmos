@@ -10,7 +10,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler, ConversationHandler
 import pytz
 
 from database import get_reminder_by_id, update_reminder_time, get_user
-from parsers.time_parser import parse_reminder
+from parsers.time_parser import parse_reminder, format_datetime
 from i18n import get_text
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,7 @@ async def postpone_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(user_id)
     user_lang = user.get("language", "en") if user else "en"
     user_timezone = user.get("timezone", "Europe/Belgrade") if user else "Europe/Belgrade"
+    user_time_format = user.get("time_format", "24h") if user else "24h"
 
     # Get reminder from database
     reminder = get_reminder_by_id(reminder_id)
@@ -100,8 +101,18 @@ async def postpone_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     success = update_reminder_time(reminder_id, new_time_naive)
 
     if success:
-        await query.edit_message_text(
-            get_text("reminder_postponed", user_lang)
+        # Remove keyboard from original message (keep reminder visible but remove buttons)
+        try:
+            await query.edit_message_reply_markup(reply_markup=None)
+        except:
+            pass  # If message can't be edited, that's ok
+
+        # Format the new time for display
+        formatted_time = format_datetime(new_time_naive, user_lang, user_time_format)
+
+        # Send confirmation as a new message (don't edit the original)
+        await query.message.reply_text(
+            get_text("reminder_postponed_to", user_lang, time=formatted_time)
         )
         logger.info(f"Reminder {reminder_id} postponed by {duration} to {new_time}")
     else:
@@ -128,6 +139,7 @@ async def custom_time_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     user = get_user(user_id)
     user_lang = user.get("language", "en") if user else "en"
     user_timezone = user.get("timezone", "Europe/Belgrade") if user else "Europe/Belgrade"
+    user_time_format = user.get("time_format", "24h") if user else "24h"
 
     # Get reminder to get the original text
     reminder = get_reminder_by_id(reminder_id)
@@ -159,8 +171,11 @@ async def custom_time_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         success = update_reminder_time(reminder_id, new_time)
 
         if success:
+            # Format the new time for display
+            formatted_time = format_datetime(new_time, user_lang, user_time_format)
+
             await update.message.reply_text(
-                get_text("reminder_postponed", user_lang)
+                get_text("reminder_postponed_to", user_lang, time=formatted_time)
             )
             logger.info(f"Reminder {reminder_id} postponed to custom time {new_time}")
         else:

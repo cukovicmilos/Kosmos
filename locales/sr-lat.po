@@ -43,6 +43,9 @@ msgstr "🔔 *Podsetnik:*\n\n{message}"
 msgid "reminder_postponed"
 msgstr "Podsetnik odložen ✓"
 
+msgid "reminder_postponed_to"
+msgstr "⏰ Podsetnik odložen za {time}"
+
 msgid "custom_time_prompt"
 msgstr "Unesi novo vreme (npr. 19:00 ili uto 19:00):"
 
