@@ -6,9 +6,11 @@
 
 - Create reminders with natural language time expressions
 - Multiple language support (English, Serbian)
-- Postpone reminders with quick actions (15m, 30m, 1h, 3h, 1d)
+- Postpone reminders with quick actions (15m, 30m, 1h, 3h, 1d) or custom time
 - List and manage all your upcoming reminders
-- Timezone support
+- Persistent keyboard buttons for quick access (List, Settings)
+- Smart reminder confirmations showing scheduled time
+- Timezone support with accurate local time handling
 - Customizable time format (12h/24h)
 
 ## Quick Start
@@ -57,15 +59,41 @@ python main.py
 
 ### Creating a Reminder
 
+Simply send a message with your reminder text and time:
+
 ```
 Take fishing rod to the lake tomorrow 16:00
 Meeting mon 10:00
 Coffee 14:30
 ```
 
+You'll receive a confirmation showing when the reminder is scheduled:
+```
+✓ Coffee > 14:30
+✓ Meeting > 15.11.2025. 10:00
+```
+
+### Quick Access Buttons
+
+After running `/start`, you'll see persistent buttons at the bottom of your chat:
+- **📋 List** - Quickly view all your reminders
+- **⚙️ Settings** - Access settings menu
+
+### Postponing Reminders
+
+When a reminder arrives, you can postpone it with:
+- Quick actions: 15 min, 30 min, 1h, 3h, 1 day
+- Custom time: Choose "Drugo vreme" / "Custom time" and enter specific time (e.g., `19:00` or `tue 14:00`)
+
+After postponing, you'll see:
+```
+⏰ Coffee > 15:30  (if today)
+⏰ Meeting > 16.11.2025. 10:00  (if another day)
+```
+
 ### Commands
 
-- `/start` - Initialize the bot
+- `/start` - Initialize the bot and show keyboard buttons
 - `/list` - View all upcoming reminders
 - `/settings` - Configure language, time format, and timezone
 - `/help` - Get help and usage examples
@@ -94,10 +122,12 @@ See [plan.md](../plan.md) for detailed project documentation and implementation 
 All major features implemented:
 - ✅ Bot initialization with timezone selection
 - ✅ Natural language time parsing (SR/EN)
-- ✅ Scheduler and reminder delivery
-- ✅ Postpone functionality
-- ✅ List and delete reminders
+- ✅ Scheduler and reminder delivery with accurate timezone handling
+- ✅ Postpone functionality (quick actions + custom time)
+- ✅ List and delete reminders (with sequential numbering)
 - ✅ Settings configuration (language, time format, timezone)
+- ✅ Persistent keyboard buttons for quick access
+- ✅ Smart reminder confirmations with scheduled time display
 
 ## Troubleshooting
 
@@ -115,6 +145,16 @@ All major features implemented:
 - Time must be at the end of the message
 - If time has passed today (and no day specified), bot assumes tomorrow
 - Weekdays always mean next occurrence
+
+### Keyboard buttons not showing
+- Send `/start` command to initialize persistent keyboard
+- Restart Telegram app if buttons don't appear
+- Make sure you have the latest version of Telegram
+
+### Postpone custom time not working
+- Make sure to enter time in correct format: `19:00` or `tue 14:00`
+- Time must be valid (0-23 hours, 0-59 minutes)
+- If entering a day, use supported day names (mon, tue, tomorrow, etc.)
 
 ### Database issues
 - Delete `kosmos.db` and restart bot to recreate database
