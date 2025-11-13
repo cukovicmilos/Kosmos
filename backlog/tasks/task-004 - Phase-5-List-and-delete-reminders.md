@@ -1,9 +1,10 @@
 ---
 id: task-004
 title: 'Phase 5: List and delete reminders'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2025-11-12 21:28'
+updated_date: '2025-11-13 18:40'
 labels:
   - phase-5
   - list-reminders
