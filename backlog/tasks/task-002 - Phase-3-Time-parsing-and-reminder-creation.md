@@ -1,9 +1,10 @@
 ---
 id: task-002
 title: 'Phase 3: Time parsing and reminder creation'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2025-11-12 21:28'
+updated_date: '2025-11-13 18:21'
 labels:
   - phase-3
   - time-parsing
