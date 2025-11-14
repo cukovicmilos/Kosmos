@@ -26,11 +26,11 @@ def get_main_keyboard(language: str = "en"):
     """
     if language == "sr-lat":
         keyboard = [
-            [KeyboardButton("📋 Lista"), KeyboardButton("⚙️ Podešavanja")],
+            [KeyboardButton("📋 Lista")],
         ]
     else:
         keyboard = [
-            [KeyboardButton("📋 List"), KeyboardButton("⚙️ Settings")],
+            [KeyboardButton("📋 List")],
         ]
 
     return ReplyKeyboardMarkup(
@@ -188,7 +188,7 @@ async def timezone_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_keyboard_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Handle keyboard button presses (List, Settings, etc).
+    Handle keyboard button presses (List).
     """
     text = update.message.text
     user_id = update.effective_user.id
@@ -205,10 +205,6 @@ async def handle_keyboard_buttons(update: Update, context: ContextTypes.DEFAULT_
         # Import list handler to avoid circular import
         from . import list as list_handler
         await list_handler.list_command(update, context)
-    elif text in ["⚙️ Settings", "⚙️ Podešavanja"]:
-        # Import settings handler to avoid circular import
-        from . import settings as settings_handler
-        await settings_handler.settings_command(update, context)
 
 
 def register_handlers(application):
@@ -221,5 +217,5 @@ def register_handlers(application):
     application.add_handler(CallbackQueryHandler(timezone_callback, pattern="^tz_"))
 
     # Handler for keyboard buttons - must be before generic text handler
-    keyboard_filter = filters.Regex("^(📋 List|📋 Lista|⚙️ Settings|⚙️ Podešavanja)$")
+    keyboard_filter = filters.Regex("^(📋 List|📋 Lista)$")
     application.add_handler(MessageHandler(keyboard_filter, handle_keyboard_buttons))
