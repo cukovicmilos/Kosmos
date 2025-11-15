@@ -1,9 +1,10 @@
 ---
 id: task-008
 title: Implementirati /recurring command wizard
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-14 21:40'
+updated_date: '2025-11-15 18:49'
 labels:
   - handler
   - recurring
@@ -30,9 +31,9 @@ Kreirati novi fajl: handlers/recurring.py
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ConversationHandler implementiran sa svim koracima
-- [ ] #2 Svi tipovi ponavljanja podržani (daily, interval, weekly, monthly)
-- [ ] #3 Validacija inputa (broj dana, vreme, dani)
-- [ ] #4 Potvrda sa pregledom pre kreiranja
-- [ ] #5 Registrovan handler u main.py
+- [x] #1 ConversationHandler implementiran sa svim koracima
+- [x] #2 Svi tipovi ponavljanja podržani (daily, interval, weekly, monthly)
+- [x] #3 Validacija inputa (broj dana, vreme, dani)
+- [x] #4 Potvrda sa pregledom pre kreiranja
+- [x] #5 Registrovan handler u main.py
 <!-- AC:END -->
