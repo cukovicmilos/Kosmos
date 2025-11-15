@@ -1,9 +1,10 @@
 ---
 id: task-007
 title: Database schema update za recurring reminders
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-14 21:40'
+updated_date: '2025-11-15 18:38'
 labels:
   - database
   - schema
@@ -29,7 +30,7 @@ Fajl: database.py
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Nove kolone dodate u CREATE TABLE statement
-- [ ] #2 Migration funkcija kreira kolone ako ne postoje
-- [ ] #3 Testirana migracija na postojećoj bazi
+- [x] #1 Nove kolone dodate u CREATE TABLE statement
+- [x] #2 Migration funkcija kreira kolone ako ne postoje
+- [x] #3 Testirana migracija na postojećoj bazi
 <!-- AC:END -->
