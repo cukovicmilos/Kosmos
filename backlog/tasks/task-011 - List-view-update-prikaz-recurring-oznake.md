@@ -1,9 +1,10 @@
 ---
 id: task-011
 title: List view update - prikaz recurring oznake
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-14 21:41'
+updated_date: '2025-11-15 19:03'
 labels:
   - list
   - ui
@@ -29,8 +30,8 @@ Fajl: handlers/list.py
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Recurring reminders imaju 🔁 oznaku
-- [ ] #2 Prikazan opis ponavljanja na srpskom i engleskom
-- [ ] #3 Prikazan sledeći occurrence
-- [ ] #4 One-time reminders prikazani normalno
+- [x] #1 Recurring reminders imaju 🔁 oznaku
+- [x] #2 Prikazan opis ponavljanja na srpskom i engleskom
+- [x] #3 Prikazan sledeći occurrence
+- [x] #4 One-time reminders prikazani normalno
 <!-- AC:END -->
