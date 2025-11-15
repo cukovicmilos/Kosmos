@@ -1,9 +1,10 @@
 ---
 id: task-012
 title: Delete confirmation za recurring reminders
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-14 21:41'
+updated_date: '2025-11-15 19:19'
 labels:
   - delete
   - ui
@@ -27,8 +28,8 @@ Fajlovi: handlers/list.py (i možda novi callback)
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Confirmation dialog za recurring reminders
-- [ ] #2 One-time reminders se brišu direktno kao pre
-- [ ] #3 Cancel dugme funkcioniše
-- [ ] #4 Status se postavlja na 'cancelled'
+- [x] #1 Confirmation dialog za recurring reminders
+- [x] #2 One-time reminders se brišu direktno kao pre
+- [x] #3 Cancel dugme funkcioniše
+- [x] #4 Status se postavlja na 'cancelled'
 <!-- AC:END -->
