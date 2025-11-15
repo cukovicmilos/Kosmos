@@ -1,9 +1,10 @@
 ---
 id: task-009
 title: Scheduler auto-reschedule logika za recurring reminders
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-14 21:41'
+updated_date: '2025-11-15 18:44'
 labels:
   - scheduler
   - recurring
@@ -30,9 +31,9 @@ Fajl: scheduler.py
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Funkcija calculate_next_occurrence() implementirana
-- [ ] #2 Scheduler proverava is_recurring flag
-- [ ] #3 Recurring reminders se reschedule-uju umesto marking sent
-- [ ] #4 One-time reminders i dalje rade normalno (status=sent)
-- [ ] #5 Testiran svaki tip ponavljanja
+- [x] #1 Funkcija calculate_next_occurrence() implementirana
+- [x] #2 Scheduler proverava is_recurring flag
+- [x] #3 Recurring reminders se reschedule-uju umesto marking sent
+- [x] #4 One-time reminders i dalje rade normalno (status=sent)
+- [x] #5 Testiran svaki tip ponavljanja
 <!-- AC:END -->
