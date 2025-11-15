@@ -1,9 +1,10 @@
 ---
 id: task-014
 title: Dodati /recurring u bot commands i dokumentaciju
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-14 21:41'
+updated_date: '2025-11-15 19:22'
 labels:
   - documentation
   - commands
@@ -26,7 +27,7 @@ Fajlovi: main.py, handlers/help.py, README.md
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 /recurring vidljiv u bot menu
-- [ ] #2 Help poruka objašnjava recurring
-- [ ] #3 README ažuriran sa primerima
+- [x] #1 /recurring vidljiv u bot menu
+- [x] #2 Help poruka objašnjava recurring
+- [x] #3 README ažuriran sa primerima
 <!-- AC:END -->
