@@ -1,9 +1,10 @@
 ---
 id: task-013
 title: Database migration funkcija za recurring kolone
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-14 21:41'
+updated_date: '2025-11-15 18:38'
 labels:
   - database
   - migration
@@ -27,9 +28,9 @@ Fajl: database.py
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Migration funkcija proverava postojanje kolona
-- [ ] #2 ALTER TABLE komande dodaju kolone
-- [ ] #3 Migracija se izvršava automatski pri startu
-- [ ] #4 Ne crashuje ako kolone već postoje
-- [ ] #5 Testirana na production bazi
+- [x] #1 Migration funkcija proverava postojanje kolona
+- [x] #2 ALTER TABLE komande dodaju kolone
+- [x] #3 Migracija se izvršava automatski pri startu
+- [x] #4 Ne crashuje ako kolone već postoje
+- [x] #5 Testirana na production bazi
 <!-- AC:END -->
