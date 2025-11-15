@@ -1,9 +1,10 @@
 ---
 id: task-010
 title: Postpone handling - kreiranje one-time instance
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-11-14 21:41'
+updated_date: '2025-11-15 19:11'
 labels:
   - postpone
   - recurring
@@ -28,8 +29,8 @@ Fajl: handlers/postpone.py
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Postpone za recurring kreira novu instancu
-- [ ] #2 Originalni recurring nastavlja normalno
-- [ ] #3 Postpone za one-time radi kao pre
-- [ ] #4 Poruka korisniku jasno pokazuje šta se desilo
+- [x] #1 Postpone za recurring kreira novu instancu
+- [x] #2 Originalni recurring nastavlja normalno
+- [x] #3 Postpone za one-time radi kao pre
+- [x] #4 Poruka korisniku jasno pokazuje šta se desilo
 <!-- AC:END -->
