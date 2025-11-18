@@ -26,11 +26,11 @@ def get_main_keyboard(language: str = "en"):
     """
     if language == "sr-lat":
         keyboard = [
-            [KeyboardButton("📋 Lista")],
+            [KeyboardButton("📋 Lista"), KeyboardButton("🔁 Ponavljajući")],
         ]
     else:
         keyboard = [
-            [KeyboardButton("📋 List")],
+            [KeyboardButton("📋 List"), KeyboardButton("🔁 Recurring")],
         ]
 
     return ReplyKeyboardMarkup(
@@ -189,6 +189,7 @@ async def timezone_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_keyboard_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Handle keyboard button presses (List).
+    Note: Recurring button is handled by ConversationHandler in recurring.py
     """
     text = update.message.text
     user_id = update.effective_user.id
@@ -217,5 +218,6 @@ def register_handlers(application):
     application.add_handler(CallbackQueryHandler(timezone_callback, pattern="^tz_"))
 
     # Handler for keyboard buttons - must be before generic text handler
+    # Note: Recurring button is handled by ConversationHandler in recurring.py
     keyboard_filter = filters.Regex("^(📋 List|📋 Lista)$")
     application.add_handler(MessageHandler(keyboard_filter, handle_keyboard_buttons))

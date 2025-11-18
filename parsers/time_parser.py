@@ -300,6 +300,26 @@ def format_datetime(dt: datetime, language: str = "en", time_format: str = "24h"
     return f"{date_str} {time_str}"
 
 
+def parse_time(time_str: str) -> Optional['datetime.time']:
+    """
+    Parse time string into datetime.time object.
+
+    Args:
+        time_str: Time string (e.g., "14:30", "9am", "21")
+
+    Returns:
+        datetime.time object or None if parsing fails
+    """
+    from datetime import time as dt_time
+
+    parsed = parse_time_string(time_str)
+    if parsed:
+        hour, minute = parsed
+        return dt_time(hour, minute)
+
+    return None
+
+
 if __name__ == "__main__":
     # Test the parser
     from config import setup_logging

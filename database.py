@@ -34,6 +34,41 @@ def get_db_connection():
         conn.close()
 
 
+def migrate_recurring_columns(cursor):
+    """
+    Migration function to add recurring reminder columns to existing reminders table.
+    Checks if columns exist before adding them to prevent errors.
+    """
+    logger.info("Checking for recurring columns migration...")
+
+    # Get existing columns
+    cursor.execute("PRAGMA table_info(reminders)")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+
+    # Define new columns to add
+    new_columns = {
+        'is_recurring': 'INTEGER DEFAULT 0',
+        'recurrence_type': 'TEXT',
+        'recurrence_interval': 'INTEGER',
+        'recurrence_days': 'TEXT',
+        'recurrence_day_of_month': 'INTEGER'
+    }
+
+    # Add missing columns
+    for column_name, column_def in new_columns.items():
+        if column_name not in existing_columns:
+            try:
+                cursor.execute(f"ALTER TABLE reminders ADD COLUMN {column_name} {column_def}")
+                logger.info(f"Added column '{column_name}' to reminders table")
+            except Exception as e:
+                logger.error(f"Error adding column '{column_name}': {e}")
+                raise
+        else:
+            logger.debug(f"Column '{column_name}' already exists, skipping")
+
+    logger.info("Recurring columns migration completed")
+
+
 def init_database():
     """
     Initialize database and create tables if they don't exist.
@@ -64,6 +99,11 @@ def init_database():
                 scheduled_time TIMESTAMP NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 status TEXT DEFAULT 'pending',
+                is_recurring INTEGER DEFAULT 0,
+                recurrence_type TEXT,
+                recurrence_interval INTEGER,
+                recurrence_days TEXT,
+                recurrence_day_of_month INTEGER,
                 FOREIGN KEY (user_id) REFERENCES users(telegram_id) ON DELETE CASCADE
             )
         """)
@@ -78,6 +118,9 @@ def init_database():
             CREATE INDEX IF NOT EXISTS idx_reminders_scheduled_time
             ON reminders(scheduled_time, status)
         """)
+
+        # Run migrations for recurring reminders feature
+        migrate_recurring_columns(cursor)
 
         logger.info("Database initialized successfully")
 
@@ -191,14 +234,28 @@ def update_user_timezone(telegram_id: int, timezone: str) -> bool:
 
 # ==================== REMINDER OPERATIONS ====================
 
-def create_reminder(user_id: int, message_text: str, scheduled_time: datetime) -> Optional[int]:
+def create_reminder(
+    user_id: int,
+    message_text: str,
+    scheduled_time: datetime,
+    is_recurring: bool = False,
+    recurrence_type: Optional[str] = None,
+    recurrence_interval: Optional[int] = None,
+    recurrence_days: Optional[str] = None,
+    recurrence_day_of_month: Optional[int] = None
+) -> Optional[int]:
     """
-    Create a new reminder.
+    Create a new reminder (one-time or recurring).
 
     Args:
         user_id: Telegram user ID
         message_text: The reminder message
         scheduled_time: When to send the reminder (datetime object)
+        is_recurring: Whether this is a recurring reminder
+        recurrence_type: Type of recurrence ('daily', 'interval', 'weekly', 'monthly')
+        recurrence_interval: For 'interval' type - number of days between occurrences
+        recurrence_days: For 'weekly' type - JSON array of days (e.g., '["monday", "wednesday"]')
+        recurrence_day_of_month: For 'monthly' type - day of month (1-31)
 
     Returns:
         Reminder ID if created successfully, None otherwise
@@ -207,12 +264,21 @@ def create_reminder(user_id: int, message_text: str, scheduled_time: datetime) -
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO reminders (user_id, message_text, scheduled_time, status)
-                VALUES (?, ?, ?, 'pending')
-            """, (user_id, message_text, scheduled_time))
+                INSERT INTO reminders (
+                    user_id, message_text, scheduled_time, status,
+                    is_recurring, recurrence_type, recurrence_interval,
+                    recurrence_days, recurrence_day_of_month
+                )
+                VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)
+            """, (
+                user_id, message_text, scheduled_time,
+                1 if is_recurring else 0, recurrence_type, recurrence_interval,
+                recurrence_days, recurrence_day_of_month
+            ))
 
             reminder_id = cursor.lastrowid
-            logger.info(f"Reminder created: ID={reminder_id}, user={user_id}, time={scheduled_time}")
+            recurring_info = f", recurring={recurrence_type}" if is_recurring else ""
+            logger.info(f"Reminder created: ID={reminder_id}, user={user_id}, time={scheduled_time}{recurring_info}")
             return reminder_id
     except Exception as e:
         logger.error(f"Error creating reminder for user {user_id}: {e}")

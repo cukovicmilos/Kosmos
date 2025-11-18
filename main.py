@@ -12,7 +12,7 @@ from telegram.ext import (
 
 from config import BOT_TOKEN, setup_logging
 from database import init_database
-from handlers import start, help as help_handler, reminder, postpone, list_handler, settings
+from handlers import start, help as help_handler, reminder, postpone, list_handler, settings, recurring
 from scheduler import start_scheduler
 
 # Setup logging
@@ -29,6 +29,7 @@ async def post_init(application: Application) -> None:
         BotCommand("start", "Start the bot"),
         BotCommand("help", "Show help message"),
         BotCommand("list", "View upcoming reminders"),
+        BotCommand("recurring", "Create recurring reminder"),
         BotCommand("settings", "Change settings"),
     ]
     await application.bot.set_my_commands(commands)
@@ -55,6 +56,7 @@ def main():
     help_handler.register_handlers(application)
     list_handler.register_handlers(application)  # List and delete commands
     settings.register_handlers(application)  # Settings command and callbacks
+    recurring.register_handlers(application)  # Recurring reminder conversation
     postpone.register_handlers(application)  # Register postpone callbacks
     reminder.register_handlers(application)  # Must be last (catches all text messages)
 

@@ -5,10 +5,11 @@
 ## Features
 
 - Create reminders with natural language time expressions
+- **🔁 Recurring reminders** - Daily, every X days, weekly (specific days), or monthly
 - Multiple language support (English, Serbian)
 - Postpone reminders with quick actions (15m, 30m, 1h, 3h, 1d) or custom time
 - List and manage all your upcoming reminders
-- Persistent keyboard buttons for quick access (List, Settings)
+- Persistent keyboard buttons for quick access (List, Recurring)
 - Smart reminder confirmations showing scheduled time
 - Timezone support with accurate local time handling
 - Customizable time format (12h/24h)
@@ -77,7 +78,7 @@ You'll receive a confirmation showing when the reminder is scheduled:
 
 After running `/start`, you'll see persistent buttons at the bottom of your chat:
 - **📋 List** - Quickly view all your reminders
-- **⚙️ Settings** - Access settings menu
+- **🔁 Recurring** - Create a new recurring reminder
 
 ### Postponing Reminders
 
@@ -95,8 +96,38 @@ After postponing, you'll see:
 
 - `/start` - Initialize the bot and show keyboard buttons
 - `/list` - View all upcoming reminders
+- `/recurring` - Create a recurring reminder (daily, weekly, monthly, etc.)
 - `/settings` - Configure language, time format, and timezone
 - `/help` - Get help and usage examples
+
+### Creating Recurring Reminders
+
+Use `/recurring` command to create reminders that repeat automatically:
+
+1. **Daily** - Every day at the same time
+   ```
+   Example: Daily standup meeting at 10:00
+   ```
+
+2. **Every X Days** - Repeat every N days
+   ```
+   Example: Water plants every 3 days at 09:00
+   ```
+
+3. **Weekly (Specific Days)** - Repeat on selected weekdays
+   ```
+   Example: Team meeting every Monday, Wednesday, Friday at 14:00
+   ```
+
+4. **Monthly** - Repeat on specific day of the month
+   ```
+   Example: Pay rent on the 1st of each month at 12:00
+   ```
+
+Recurring reminders are shown with a 🔁 icon in your list.
+
+**Postponing Recurring Reminders:**
+When you postpone a recurring reminder, a new one-time reminder is created while the original continues on its schedule.
 
 ## Supported Time Formats
 
@@ -117,12 +148,13 @@ See [plan.md](../plan.md) for detailed project documentation and implementation 
 
 ## Development Status
 
-✅ **Completed** - Version 1.0
+✅ **Completed** - Version 1.1
 
 All major features implemented:
 - ✅ Bot initialization with timezone selection
 - ✅ Natural language time parsing (SR/EN)
 - ✅ Scheduler and reminder delivery with accurate timezone handling
+- ✅ **Recurring reminders** (daily, interval, weekly, monthly)
 - ✅ Postpone functionality (quick actions + custom time)
 - ✅ List and delete reminders (with sequential numbering)
 - ✅ Settings configuration (language, time format, timezone)

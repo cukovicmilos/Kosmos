@@ -9,7 +9,7 @@ from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler, ConversationHandler, MessageHandler, filters
 import pytz
 
-from database import get_reminder_by_id, update_reminder_time, get_user
+from database import get_reminder_by_id, update_reminder_time, get_user, create_reminder
 from parsers.time_parser import parse_reminder, format_datetime
 from i18n import get_text
 
@@ -97,8 +97,24 @@ async def postpone_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Remove timezone info to store as local time in database
     new_time_naive = new_time.replace(tzinfo=None)
 
-    # Update reminder in database
-    success = update_reminder_time(reminder_id, new_time_naive)
+    # Check if this is a recurring reminder
+    is_recurring = reminder.get('is_recurring', 0)
+
+    if is_recurring:
+        # For recurring reminders, create a NEW one-time instance
+        # The original recurring reminder continues on its schedule
+        new_reminder_id = create_reminder(
+            user_id=user_id,
+            message_text=reminder['message_text'],
+            scheduled_time=new_time_naive,
+            is_recurring=False  # One-time instance
+        )
+        success = new_reminder_id is not None
+        logger.info(f"Created postponed one-time instance {new_reminder_id} from recurring reminder {reminder_id}")
+    else:
+        # For one-time reminders, update the existing reminder
+        success = update_reminder_time(reminder_id, new_time_naive)
+        logger.info(f"Updated one-time reminder {reminder_id} to {new_time_naive}")
 
     if success:
         # Remove keyboard from original message (keep reminder visible but remove buttons)
@@ -185,8 +201,23 @@ async def custom_time_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         _, new_time = result
 
-        # Update reminder in database
-        success = update_reminder_time(reminder_id, new_time)
+        # Check if this is a recurring reminder
+        is_recurring = reminder.get('is_recurring', 0)
+
+        if is_recurring:
+            # For recurring reminders, create a NEW one-time instance
+            new_reminder_id = create_reminder(
+                user_id=user_id,
+                message_text=reminder['message_text'],
+                scheduled_time=new_time,
+                is_recurring=False  # One-time instance
+            )
+            success = new_reminder_id is not None
+            logger.info(f"Created postponed one-time instance {new_reminder_id} from recurring reminder {reminder_id}")
+        else:
+            # For one-time reminders, update the existing reminder
+            success = update_reminder_time(reminder_id, new_time)
+            logger.info(f"Updated one-time reminder {reminder_id} to custom time {new_time}")
 
         if success:
             # Format the new time for display
