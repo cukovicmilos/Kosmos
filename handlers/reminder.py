@@ -7,10 +7,12 @@ import logging
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
+from telegram.error import NetworkError, TimedOut
 
 from database import create_reminder, get_user
 from parsers.time_parser import parse_reminder, format_datetime
 from i18n import get_text
+from message_queue import queue_message
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +67,7 @@ async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_
         )
 
         if reminder_id:
-            # Success - send confirmation with time
+            # Success - prepare confirmation message
             # Check if scheduled time is today
             now_date = datetime.now().date()
             scheduled_date = scheduled_time.date()
@@ -86,23 +88,47 @@ async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_
                     time_str = scheduled_time.strftime("%H:%M")
                 confirmation_msg = f"✓ {reminder_text} > {date_str} {time_str}"
 
-            await update.message.reply_text(confirmation_msg)
-            logger.info(
-                f"Reminder created: ID={reminder_id}, user={user_id}, "
-                f"time={scheduled_time}, text='{reminder_text}'"
-            )
+            # Try to send confirmation immediately
+            try:
+                await update.message.reply_text(confirmation_msg)
+                logger.info(
+                    f"Reminder created: ID={reminder_id}, user={user_id}, "
+                    f"time={scheduled_time}, text='{reminder_text}'"
+                )
+            except (NetworkError, TimedOut) as e:
+                # Network error - queue the confirmation for retry
+                logger.warning(f"Network error sending confirmation to user {user_id}, queuing for retry: {e}")
+                queue_message(user_id, confirmation_msg, message_type='reminder_confirmation')
+                logger.info(
+                    f"Reminder created and confirmation queued: ID={reminder_id}, user={user_id}, "
+                    f"time={scheduled_time}, text='{reminder_text}'"
+                )
+            except Exception as e:
+                # Other error - still queue for retry
+                logger.error(f"Error sending confirmation to user {user_id}, queuing for retry: {e}")
+                queue_message(user_id, confirmation_msg, message_type='reminder_confirmation')
+                logger.info(
+                    f"Reminder created and confirmation queued: ID={reminder_id}, user={user_id}, "
+                    f"time={scheduled_time}, text='{reminder_text}'"
+                )
         else:
             # Database error
-            await update.message.reply_text(
-                get_text("error_occurred", user_lang)
-            )
+            try:
+                await update.message.reply_text(
+                    get_text("error_occurred", user_lang)
+                )
+            except Exception as reply_error:
+                logger.error(f"Failed to send database error message to user {user_id}: {reply_error}")
             logger.error(f"Failed to create reminder in database for user {user_id}")
 
     except Exception as e:
         logger.error(f"Error handling reminder message from user {user_id}: {e}", exc_info=True)
-        await update.message.reply_text(
-            get_text("error_occurred", user.get("language", "en"))
-        )
+        try:
+            await update.message.reply_text(
+                get_text("error_occurred", user.get("language", "en"))
+            )
+        except Exception as reply_error:
+            logger.error(f"Failed to send error message to user {user_id}: {reply_error}")
 
 
 def register_handlers(application):

@@ -13,6 +13,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Bot
 
 from database import get_pending_reminders, update_reminder_status, update_reminder_time
 from i18n import get_text
+from message_queue import process_pending_messages, cleanup_old_messages
 
 logger = logging.getLogger(__name__)
 
@@ -226,8 +227,28 @@ def start_scheduler(bot: Bot):
         replace_existing=True
     )
 
+    # Add job to process pending messages every 30 seconds
+    scheduler.add_job(
+        process_pending_messages,
+        trigger=IntervalTrigger(seconds=30),
+        args=[bot],
+        id='process_pending_messages',
+        name='Process pending confirmation messages',
+        replace_existing=True
+    )
+
+    # Add job to cleanup old messages once per day
+    scheduler.add_job(
+        cleanup_old_messages,
+        trigger=IntervalTrigger(hours=24),
+        args=[7],  # Delete messages older than 7 days
+        id='cleanup_old_messages',
+        name='Cleanup old pending messages',
+        replace_existing=True
+    )
+
     scheduler.start()
-    logger.info("Scheduler started - checking reminders every minute")
+    logger.info("Scheduler started - checking reminders every minute, pending messages every 30 seconds")
 
 
 def stop_scheduler():
