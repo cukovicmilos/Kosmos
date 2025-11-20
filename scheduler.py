@@ -17,6 +17,14 @@ from message_queue import process_pending_messages, cleanup_old_messages
 
 logger = logging.getLogger(__name__)
 
+# Import bot_stats functions (imported here to avoid circular dependencies)
+try:
+    from bot_stats import update_bot_short_description, update_bot_description
+    BOT_STATS_AVAILABLE = True
+except ImportError:
+    logger.warning("bot_stats module not available")
+    BOT_STATS_AVAILABLE = False
+
 # Global scheduler instance
 scheduler = None
 
@@ -246,6 +254,28 @@ def start_scheduler(bot: Bot):
         name='Cleanup old pending messages',
         replace_existing=True
     )
+
+    # Add job to update bot short description every 6 hours
+    if BOT_STATS_AVAILABLE:
+        scheduler.add_job(
+            update_bot_short_description,
+            trigger=IntervalTrigger(hours=6),
+            args=[bot],
+            id='update_short_description',
+            name='Update bot short description with active users',
+            replace_existing=True
+        )
+        
+        # Add job to update full description once per day
+        scheduler.add_job(
+            update_bot_description,
+            trigger=IntervalTrigger(hours=24),
+            args=[bot],
+            id='update_full_description',
+            name='Update bot full description',
+            replace_existing=True
+        )
+        logger.info("Bot statistics update jobs scheduled")
 
     scheduler.start()
     logger.info("Scheduler started - checking reminders every minute, pending messages every 30 seconds")

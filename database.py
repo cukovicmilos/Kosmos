@@ -427,6 +427,74 @@ def get_reminder_by_id(reminder_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 
+# ==================== STATISTICS OPERATIONS ====================
+
+def get_monthly_active_users() -> int:
+    """
+    Get count of users who created at least one reminder in the last 30 days.
+
+    Returns:
+        Number of active users in the last month
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT COUNT(DISTINCT user_id) as active_users
+                FROM reminders
+                WHERE created_at >= datetime('now', '-30 days')
+            """)
+            row = cursor.fetchone()
+            return row['active_users'] if row else 0
+    except Exception as e:
+        logger.error(f"Error getting monthly active users: {e}")
+        return 0
+
+
+def get_peak_monthly_users() -> int:
+    """
+    Get the highest number of unique users who created reminders in any single month.
+
+    Returns:
+        Peak number of users in a month
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT MAX(monthly_users) as peak_users
+                FROM (
+                    SELECT COUNT(DISTINCT user_id) as monthly_users
+                    FROM reminders
+                    WHERE created_at IS NOT NULL
+                    GROUP BY strftime('%Y-%m', created_at)
+                )
+            """)
+            row = cursor.fetchone()
+            return row['peak_users'] if row and row['peak_users'] else 0
+    except Exception as e:
+        logger.error(f"Error getting peak monthly users: {e}")
+        return 0
+
+
+def get_total_users() -> int:
+    """
+    Get total number of registered users.
+
+    Returns:
+        Total number of users
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) as total FROM users")
+            row = cursor.fetchone()
+            return row['total'] if row else 0
+    except Exception as e:
+        logger.error(f"Error getting total users: {e}")
+        return 0
+
+
 # Initialize database on module import
 if __name__ == "__main__":
     # When run directly, initialize the database

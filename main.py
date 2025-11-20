@@ -15,6 +15,13 @@ from database import init_database
 from handlers import start, help as help_handler, reminder, postpone, list_handler, settings, recurring
 from scheduler import start_scheduler
 
+# Try to import bot_stats for initial description update
+try:
+    from bot_stats import update_bot_short_description, update_bot_description
+    BOT_STATS_AVAILABLE = True
+except ImportError:
+    BOT_STATS_AVAILABLE = False
+
 # Setup logging
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -34,6 +41,15 @@ async def post_init(application: Application) -> None:
     ]
     await application.bot.set_my_commands(commands)
     logger.info("Bot commands registered")
+
+    # Update bot descriptions with statistics on startup
+    if BOT_STATS_AVAILABLE:
+        try:
+            await update_bot_short_description(application.bot)
+            await update_bot_description(application.bot)
+            logger.info("Bot descriptions updated with statistics")
+        except Exception as e:
+            logger.error(f"Failed to update bot descriptions: {e}")
 
     # Start the scheduler for checking and sending reminders
     start_scheduler(application.bot)
