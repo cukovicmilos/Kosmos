@@ -17,7 +17,7 @@ from message_queue import queue_message
 logger = logging.getLogger(__name__)
 
 
-async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Handle regular text messages and try to parse them as reminders.
 
@@ -27,6 +27,19 @@ async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_
     - "Meeting mon 10:00"
     - "Call John 18:30"
     """
+    # Guard clauses for None checks
+    if not update.effective_user:
+        logger.warning("Received update without effective_user")
+        return
+    
+    if not update.message:
+        logger.warning("Received update without message")
+        return
+    
+    if not update.message.text:
+        logger.warning("Received message without text")
+        return
+    
     user_id = update.effective_user.id
     message_text = update.message.text
 
@@ -80,13 +93,14 @@ async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_
                     time_str = scheduled_time.strftime("%H:%M")
                 confirmation_msg = f"✓ {reminder_text} > {time_str}"
             else:
-                # Another day - show date and time
+                # Another day - show day abbreviation, date and time
+                day_abbr = scheduled_time.strftime("%a")
                 date_str = scheduled_time.strftime("%d.%m.%Y.")
                 if user_time_format == "12h":
                     time_str = scheduled_time.strftime("%I:%M %p")
                 else:
                     time_str = scheduled_time.strftime("%H:%M")
-                confirmation_msg = f"✓ {reminder_text} > {date_str} {time_str}"
+                confirmation_msg = f"✓ {reminder_text} > {day_abbr} {date_str} {time_str}"
 
             # Try to send confirmation immediately
             try:
