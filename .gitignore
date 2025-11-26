@@ -49,3 +49,22 @@ Thumbs.db
 # Telegram bot specific
 bot_data/
 session_*
+
+# Backup files
+*.backup
+database.py.backup
+handlers/reminder.py.backup
+scheduler.py.backup
+
+# Patch and deployment files
+apply_patch.sh
+patch_database.py
+deploy.sh
+PATCH_BOT_STATS.md
+PRIMENI_PATCH.txt
+README_PATCH.md
+TELEGRAM_MENU_CACHE_FIX.md
+IMPLEMENTATION_SUMMARY.md
+
+# Test files
+test_bot_stats.py
