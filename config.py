@@ -39,6 +39,15 @@ DEFAULT_LANGUAGE = "en"
 TIME_FORMAT_12H = "12h"
 TIME_FORMAT_24H = "24h"
 
+# Network timeout configuration (in seconds)
+TELEGRAM_CONNECT_TIMEOUT = float(os.getenv("TELEGRAM_CONNECT_TIMEOUT", "20.0"))  # Connection timeout
+TELEGRAM_READ_TIMEOUT = float(os.getenv("TELEGRAM_READ_TIMEOUT", "30.0"))  # Read timeout
+TELEGRAM_WRITE_TIMEOUT = float(os.getenv("TELEGRAM_WRITE_TIMEOUT", "30.0"))  # Write timeout
+TELEGRAM_POOL_TIMEOUT = float(os.getenv("TELEGRAM_POOL_TIMEOUT", "10.0"))  # Pool timeout
+
+# Monitoring configuration
+MAX_CONSECUTIVE_TIMEOUTS = int(os.getenv("MAX_CONSECUTIVE_TIMEOUTS", "3"))  # Alert threshold
+
 
 def setup_logging():
     """

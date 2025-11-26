@@ -14,6 +14,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Bot
 from database import get_pending_reminders, update_reminder_status, update_reminder_time
 from i18n import get_text
 from message_queue import process_pending_messages, cleanup_old_messages
+from network_monitor import record_network_timeout, record_network_success
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +190,9 @@ async def send_reminder(bot: Bot, reminder: dict):
             parse_mode="Markdown",
             reply_markup=reply_markup
         )
+        
+        # Record successful network operation
+        record_network_success(f"send_reminder_{reminder_id}")
 
         # Check if this is a recurring reminder
         is_recurring = reminder.get('is_recurring', 0)
@@ -206,6 +210,12 @@ async def send_reminder(bot: Bot, reminder: dict):
         logger.info(f"Reminder {reminder_id} sent to user {user_id}")
 
     except Exception as e:
+        error_msg = str(e)
+        
+        # Check if this is a timeout error
+        if 'timeout' in error_msg.lower() or 'timed out' in error_msg.lower():
+            record_network_timeout(f"send_reminder_{reminder_id}", error_msg)
+        
         logger.error(f"Failed to send reminder {reminder_id} to user {user_id}: {e}", exc_info=True)
         # Don't update status if sending failed - will retry next time
 

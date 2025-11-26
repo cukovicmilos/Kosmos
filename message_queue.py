@@ -11,6 +11,7 @@ from telegram import Bot
 from telegram.error import TelegramError, NetworkError, TimedOut
 
 from database import get_db_connection
+from network_monitor import record_network_timeout, record_network_success
 
 logger = logging.getLogger(__name__)
 
@@ -199,12 +200,14 @@ async def send_pending_message(bot: Bot, message: Dict[str, Any]):
             parse_mode=parse_mode
         )
         
-        # Success - delete from queue
+        # Success - record and delete from queue
+        record_network_success(f"pending_message_{message_id}")
         delete_pending_message(message_id)
         logger.info(f"Pending message {message_id} sent successfully to user {user_id} after {retry_count} retries")
     
     except (NetworkError, TimedOut) as e:
-        # Network error - update retry count and try again later
+        # Network error - record timeout, update retry count and try again later
+        record_network_timeout(f"pending_message_{message_id}", str(e))
         update_retry_attempt(message_id)
         logger.warning(f"Network error sending pending message {message_id} (retry {retry_count + 1}): {e}")
     

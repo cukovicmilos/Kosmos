@@ -10,9 +10,16 @@ from telegram.ext import (
     ContextTypes,
 )
 
-from config import BOT_TOKEN, setup_logging
+from config import (
+    BOT_TOKEN, 
+    setup_logging,
+    TELEGRAM_CONNECT_TIMEOUT,
+    TELEGRAM_READ_TIMEOUT,
+    TELEGRAM_WRITE_TIMEOUT,
+    TELEGRAM_POOL_TIMEOUT
+)
 from database import init_database
-from handlers import start, help as help_handler, reminder, postpone, list_handler, settings, recurring
+from handlers import start, help as help_handler, reminder, postpone, list_handler, settings, recurring, netstats
 from scheduler import start_scheduler
 
 # Try to import bot_stats for initial description update
@@ -35,6 +42,7 @@ async def post_init(application: Application) -> None:
     commands = [
         BotCommand("start", "Start the bot"),
         BotCommand("help", "Show help message"),
+        BotCommand("netstats", "Network statistics"),
         BotCommand("list", "View upcoming reminders"),
         BotCommand("recurring", "Create recurring reminder"),
         BotCommand("settings", "Change settings"),
@@ -63,13 +71,27 @@ def main():
     # Initialize database
     init_database()
 
-    # Create application
-    application = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
+    # Create application with custom timeout settings
+    application = (
+        Application.builder()
+        .token(BOT_TOKEN)
+        .post_init(post_init)
+        .connect_timeout(TELEGRAM_CONNECT_TIMEOUT)
+        .read_timeout(TELEGRAM_READ_TIMEOUT)
+        .write_timeout(TELEGRAM_WRITE_TIMEOUT)
+        .pool_timeout(TELEGRAM_POOL_TIMEOUT)
+        .build()
+    )
+    
+    logger.info(f"Bot configured with timeouts: connect={TELEGRAM_CONNECT_TIMEOUT}s, "
+                f"read={TELEGRAM_READ_TIMEOUT}s, write={TELEGRAM_WRITE_TIMEOUT}s, "
+                f"pool={TELEGRAM_POOL_TIMEOUT}s")
 
     # Register handlers from modules
     # Order matters! Commands should be registered before message handlers
     start.register_handlers(application)
     help_handler.register_handlers(application)
+    netstats.register_handlers(application)  # Network statistics command
     list_handler.register_handlers(application)  # List and delete commands
     settings.register_handlers(application)  # Settings command and callbacks
     recurring.register_handlers(application)  # Recurring reminder conversation
