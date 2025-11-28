@@ -13,6 +13,7 @@ import pytz
 from database import get_user_reminders, delete_reminder, get_user
 from parsers.time_parser import format_datetime
 from i18n import get_text
+from telegram.helpers import escape_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -166,12 +167,15 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 recurring_icon = ""
                 recurrence_info = ""
 
-            message_text += f"\n{index}. {recurring_icon}{reminder_text}{recurrence_info}\n"
+            # Escape markdown characters in user text
+            safe_reminder_text = escape_markdown(reminder_text, version=1)
+            message_text += f"\n{index}. {recurring_icon}{safe_reminder_text}{recurrence_info}\n"
             message_text += f"   {date_str} {separator} {time_str}\n"
 
         except Exception as e:
             logger.error(f"Error formatting reminder {reminder['id']}: {e}", exc_info=True)
-            message_text += f"\n{index}. {reminder_text}\n"
+            safe_reminder_text = escape_markdown(reminder_text, version=1)
+            message_text += f"\n{index}. {safe_reminder_text}\n"
             message_text += f"   {scheduled_time_str}\n"
 
     # Create inline keyboard with Delete buttons
@@ -332,12 +336,15 @@ async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     recurring_icon = ""
                     recurrence_info = ""
 
-                message_text += f"\n{index}. {recurring_icon}{reminder_text}{recurrence_info}\n"
+                # Escape markdown characters in user text
+                safe_reminder_text = escape_markdown(reminder_text, version=1)
+                message_text += f"\n{index}. {recurring_icon}{safe_reminder_text}{recurrence_info}\n"
                 message_text += f"   {date_str} {separator} {time_str}\n"
 
             except Exception as e:
                 logger.error(f"Error formatting reminder {reminder['id']}: {e}", exc_info=True)
-                message_text += f"\n{index}. {reminder_text}\n"
+                safe_reminder_text = escape_markdown(reminder_text, version=1)
+                message_text += f"\n{index}. {safe_reminder_text}\n"
                 message_text += f"   {scheduled_time_str}\n"
 
         # Rebuild keyboard - use index for button text, database ID for callback
@@ -450,12 +457,15 @@ async def delete_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
                     recurring_icon = ""
                     recurrence_info = ""
 
-                message_text += f"\n{index}. {recurring_icon}{reminder_text}{recurrence_info}\n"
+                # Escape markdown characters in user text
+                safe_reminder_text = escape_markdown(reminder_text, version=1)
+                message_text += f"\n{index}. {recurring_icon}{safe_reminder_text}{recurrence_info}\n"
                 message_text += f"   {date_str} {separator} {time_str}\n"
 
             except Exception as e:
                 logger.error(f"Error formatting reminder {reminder['id']}: {e}", exc_info=True)
-                message_text += f"\n{index}. {reminder_text}\n"
+                safe_reminder_text = escape_markdown(reminder_text, version=1)
+                message_text += f"\n{index}. {safe_reminder_text}\n"
                 message_text += f"   {scheduled_time_str}\n"
 
         keyboard = []
@@ -540,12 +550,15 @@ async def delete_cancel_callback(update: Update, context: ContextTypes.DEFAULT_T
                 recurring_icon = ""
                 recurrence_info = ""
 
-            message_text += f"\n{index}. {recurring_icon}{reminder_text}{recurrence_info}\n"
+            # Escape markdown characters in user text
+            safe_reminder_text = escape_markdown(reminder_text, version=1)
+            message_text += f"\n{index}. {recurring_icon}{safe_reminder_text}{recurrence_info}\n"
             message_text += f"   {date_str} {separator} {time_str}\n"
 
         except Exception as e:
             logger.error(f"Error formatting reminder {reminder['id']}: {e}", exc_info=True)
-            message_text += f"\n{index}. {reminder_text}\n"
+            safe_reminder_text = escape_markdown(reminder_text, version=1)
+            message_text += f"\n{index}. {safe_reminder_text}\n"
             message_text += f"   {scheduled_time_str}\n"
 
     keyboard = []
