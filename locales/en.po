@@ -145,3 +145,22 @@ msgstr "List"
 
 msgid "menu_new_reminder"
 msgstr "New Reminder"
+
+# Edit reminder
+msgid "edit_button"
+msgstr "Edit"
+
+msgid "edit_prompt"
+msgstr "✏️ *Editing:* {reminder_text}\n\nReply with new text and/or time:\n• `New text 15:00` - change both\n• `New text` - change only text\n• `15:00` - change only time"
+
+msgid "edit_cancelled"
+msgstr "Edit cancelled"
+
+msgid "reminder_updated"
+msgstr "Reminder updated ✓"
+
+msgid "edit_parse_error"
+msgstr "Couldn't understand the input. Please try again or send /list to cancel."
+
+msgid "edit_not_found"
+msgstr "Reminder not found or already deleted."

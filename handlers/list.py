@@ -7,13 +7,15 @@ import json
 import logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
+from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from telegram.ext._application import ApplicationHandlerStop
 import pytz
 
-from database import get_user_reminders, delete_reminder, get_user
-from parsers.time_parser import format_datetime
+from database import get_user_reminders, delete_reminder, get_user, get_reminder_by_id, update_reminder
+from parsers.time_parser import format_datetime, parse_reminder
 from i18n import get_text
 from telegram.helpers import escape_markdown
+from telegram import ForceReply
 
 logger = logging.getLogger(__name__)
 
@@ -178,15 +180,19 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message_text += f"\n{index}. {safe_reminder_text}\n"
             message_text += f"   {scheduled_time_str}\n"
 
-    # Create inline keyboard with Delete buttons
+    # Create inline keyboard with Delete and Edit buttons
     # Use index (1, 2, 3...) in button text, but database ID in callback_data
     keyboard = []
     for index, reminder in enumerate(reminders, 1):
-        button = InlineKeyboardButton(
+        delete_button = InlineKeyboardButton(
             f"🗑️ Obriši #{index}" if user_lang == "sr-lat" else f"🗑️ Delete #{index}",
             callback_data=f"delete_{reminder['id']}"
         )
-        keyboard.append([button])
+        edit_button = InlineKeyboardButton(
+            f"✏️ Izmeni #{index}" if user_lang == "sr-lat" else f"✏️ Edit #{index}",
+            callback_data=f"edit_{reminder['id']}"
+        )
+        keyboard.append([delete_button, edit_button])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -350,11 +356,15 @@ async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Rebuild keyboard - use index for button text, database ID for callback
         keyboard = []
         for index, reminder in enumerate(reminders, 1):
-            button = InlineKeyboardButton(
+            delete_button = InlineKeyboardButton(
                 f"🗑️ Obriši #{index}" if user_lang == "sr-lat" else f"🗑️ Delete #{index}",
                 callback_data=f"delete_{reminder['id']}"
             )
-            keyboard.append([button])
+            edit_button = InlineKeyboardButton(
+                f"✏️ Izmeni #{index}" if user_lang == "sr-lat" else f"✏️ Edit #{index}",
+                callback_data=f"edit_{reminder['id']}"
+            )
+            keyboard.append([delete_button, edit_button])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -470,11 +480,15 @@ async def delete_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
 
         keyboard = []
         for index, reminder in enumerate(reminders, 1):
-            button = InlineKeyboardButton(
+            delete_button = InlineKeyboardButton(
                 f"🗑️ Obriši #{index}" if user_lang == "sr-lat" else f"🗑️ Delete #{index}",
                 callback_data=f"delete_{reminder['id']}"
             )
-            keyboard.append([button])
+            edit_button = InlineKeyboardButton(
+                f"✏️ Izmeni #{index}" if user_lang == "sr-lat" else f"✏️ Edit #{index}",
+                callback_data=f"edit_{reminder['id']}"
+            )
+            keyboard.append([delete_button, edit_button])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -563,11 +577,15 @@ async def delete_cancel_callback(update: Update, context: ContextTypes.DEFAULT_T
 
     keyboard = []
     for index, reminder in enumerate(reminders, 1):
-        button = InlineKeyboardButton(
+        delete_button = InlineKeyboardButton(
             f"🗑️ Obriši #{index}" if user_lang == "sr-lat" else f"🗑️ Delete #{index}",
             callback_data=f"delete_{reminder['id']}"
         )
-        keyboard.append([button])
+        edit_button = InlineKeyboardButton(
+            f"✏️ Izmeni #{index}" if user_lang == "sr-lat" else f"✏️ Edit #{index}",
+            callback_data=f"edit_{reminder['id']}"
+        )
+        keyboard.append([delete_button, edit_button])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -578,11 +596,187 @@ async def delete_cancel_callback(update: Update, context: ContextTypes.DEFAULT_T
     )
 
 
+async def edit_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handle edit button callback.
+    Shows edit prompt with ForceReply to capture user's new text/time.
+    """
+    query = update.callback_query
+    await query.answer()
+
+    callback_data = query.data
+    if not callback_data.startswith("edit_"):
+        return
+
+    # Extract reminder_id
+    try:
+        reminder_id = int(callback_data.split("_")[1])
+    except (IndexError, ValueError):
+        logger.error(f"Invalid edit callback data: {callback_data}")
+        return
+
+    user_id = update.effective_user.id
+
+    # Get user from database
+    user = get_user(user_id)
+    user_lang = user.get("language", "en") if user else "en"
+
+    # Get reminder
+    reminder = get_reminder_by_id(reminder_id)
+
+    if not reminder:
+        await query.answer(get_text("edit_not_found", user_lang), show_alert=True)
+        return
+
+    # Check if reminder belongs to this user
+    if reminder['user_id'] != user_id:
+        logger.warning(f"User {user_id} tried to edit reminder {reminder_id} that doesn't belong to them")
+        return
+
+    # Store reminder_id in user_data for the message handler
+    context.user_data['editing_reminder_id'] = reminder_id
+
+    # Send edit prompt with ForceReply
+    reminder_text = reminder['message_text']
+    prompt = get_text("edit_prompt", user_lang).format(reminder_text=reminder_text)
+
+    await query.message.reply_text(
+        prompt,
+        parse_mode="Markdown",
+        reply_markup=ForceReply(selective=True)
+    )
+
+    logger.info(f"User {user_id} started editing reminder {reminder_id}")
+
+
+async def edit_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handle user's reply with new reminder text/time.
+    Parses input to determine if user wants to change text, time, or both.
+    
+    Returns True if message was handled (to stop propagation to other handlers).
+    """
+    # Check if this is a reply to our edit prompt
+    if not update.message or not update.message.reply_to_message:
+        return None  # Let other handlers process
+
+    user_id = update.effective_user.id
+
+    # Check if user is in edit mode
+    reminder_id = context.user_data.get('editing_reminder_id')
+    if not reminder_id:
+        return None  # Not in edit mode, let other handlers process this
+
+    # Get user settings
+    user = get_user(user_id)
+    user_lang = user.get("language", "en") if user else "en"
+    user_timezone = user.get("timezone", "Europe/Belgrade") if user else "Europe/Belgrade"
+    user_time_format = user.get("time_format", "24h") if user else "24h"
+
+    # Get reminder
+    reminder = get_reminder_by_id(reminder_id)
+    if not reminder or reminder['user_id'] != user_id:
+        await update.message.reply_text(get_text("edit_not_found", user_lang))
+        context.user_data.pop('editing_reminder_id', None)
+        raise ApplicationHandlerStop  # Stop propagation to other handlers
+
+    user_input = update.message.text.strip()
+
+    # Try to parse input
+    # Strategy: 
+    # 1. If input looks like only time (e.g., "15:00", "3pm", "tue 15:00"), update only time
+    # 2. If input has text + time, update both
+    # 3. If input has no recognizable time, update only text
+
+    import re
+
+    # Check if input is ONLY a time pattern (no other text)
+    time_only_patterns = [
+        r'^(\d{1,2}:\d{2})$',  # 15:00
+        r'^(\d{1,2})\s*(am|pm)$',  # 3pm, 3 pm
+        r'^(pon|uto|sre|cet|čet|pet|sub|ned|mon|tue|wed|thu|fri|sat|sun)\s+\d{1,2}:\d{2}$',  # tue 15:00
+        r'^(sutra|prekosutra|tomorrow|dat)\s+\d{1,2}:\d{2}$',  # tomorrow 15:00
+    ]
+
+    is_time_only = any(re.match(pattern, user_input, re.IGNORECASE) for pattern in time_only_patterns)
+
+    new_text = None
+    new_time = None
+
+    if is_time_only:
+        # User only provided time - keep original text, update time
+        dummy_message = f"placeholder {user_input}"
+        result = parse_reminder(dummy_message, user_timezone)
+        if result:
+            _, new_time = result
+        else:
+            await update.message.reply_text(get_text("edit_parse_error", user_lang))
+            raise ApplicationHandlerStop  # Keep in edit mode, but stop propagation
+    else:
+        # Try to parse as full reminder (text + time)
+        result = parse_reminder(user_input, user_timezone)
+        if result:
+            new_text, new_time = result
+        else:
+            # No time found - treat entire input as new text only
+            new_text = user_input
+            new_time = None
+
+    # Update reminder
+    success = update_reminder(reminder_id, message_text=new_text, scheduled_time=new_time)
+
+    if success:
+        # Build confirmation message
+        final_text = new_text if new_text else reminder['message_text']
+
+        if new_time:
+            # Format the time for display
+            now_date = datetime.now().date()
+            new_time_date = new_time.date()
+
+            if now_date == new_time_date:
+                if user_time_format == "12h":
+                    time_str = new_time.strftime("%I:%M %p")
+                else:
+                    time_str = new_time.strftime("%H:%M")
+                confirmation = f"✓ {final_text} > {time_str}"
+            else:
+                date_str = new_time.strftime("%d.%m.%Y.")
+                if user_time_format == "12h":
+                    time_str = new_time.strftime("%I:%M %p")
+                else:
+                    time_str = new_time.strftime("%H:%M")
+                confirmation = f"✓ {final_text} > {date_str} {time_str}"
+        else:
+            # Only text was updated
+            confirmation = f"✓ {final_text}"
+
+        await update.message.reply_text(confirmation)
+        logger.info(f"User {user_id} updated reminder {reminder_id}: text={new_text is not None}, time={new_time is not None}")
+    else:
+        await update.message.reply_text(get_text("error_occurred", user_lang))
+
+    # Clear edit mode
+    context.user_data.pop('editing_reminder_id', None)
+    
+    # Stop propagation to prevent reminder handler from creating a new reminder
+    raise ApplicationHandlerStop
+
+
 def register_handlers(application):
     """
-    Register list and delete handlers.
+    Register list, delete, and edit handlers.
     """
     application.add_handler(CommandHandler("list", list_command))
     application.add_handler(CallbackQueryHandler(delete_confirm_callback, pattern="^delete_confirm_"))
     application.add_handler(CallbackQueryHandler(delete_cancel_callback, pattern="^delete_cancel_"))
     application.add_handler(CallbackQueryHandler(delete_callback, pattern="^delete_[0-9]+$"))
+    application.add_handler(CallbackQueryHandler(edit_callback, pattern="^edit_[0-9]+$"))
+    
+    # Handler for edit reply messages - must run BEFORE the reminder handler
+    # Using group=-1 to give it higher priority than the main reminder handler (group=0 by default)
+    # Handler raises ApplicationHandlerStop to prevent reminder creation when in edit mode
+    application.add_handler(
+        MessageHandler(filters.REPLY & filters.TEXT & ~filters.COMMAND, edit_message_handler),
+        group=-1
+    )

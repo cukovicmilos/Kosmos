@@ -403,6 +403,55 @@ def delete_reminder(reminder_id: int) -> bool:
     return update_reminder_status(reminder_id, "cancelled")
 
 
+def update_reminder(
+    reminder_id: int,
+    message_text: Optional[str] = None,
+    scheduled_time: Optional[datetime] = None
+) -> bool:
+    """
+    Update reminder text and/or scheduled time.
+
+    Args:
+        reminder_id: Reminder ID
+        message_text: New message text (optional)
+        scheduled_time: New scheduled time (optional)
+
+    Returns:
+        True if updated successfully
+    """
+    if message_text is None and scheduled_time is None:
+        logger.warning(f"update_reminder called with no changes for reminder {reminder_id}")
+        return False
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Build dynamic UPDATE query
+            updates = []
+            params = []
+
+            if message_text is not None:
+                updates.append("message_text = ?")
+                params.append(message_text)
+
+            if scheduled_time is not None:
+                updates.append("scheduled_time = ?")
+                updates.append("status = 'pending'")  # Reset status when time changes
+                params.append(scheduled_time)
+
+            params.append(reminder_id)
+
+            query = f"UPDATE reminders SET {', '.join(updates)} WHERE id = ?"
+            cursor.execute(query, params)
+
+            logger.info(f"Reminder {reminder_id} updated: text={message_text is not None}, time={scheduled_time is not None}")
+            return True
+    except Exception as e:
+        logger.error(f"Error updating reminder {reminder_id}: {e}")
+        return False
+
+
 def get_reminder_by_id(reminder_id: int) -> Optional[Dict[str, Any]]:
     """
     Get reminder by ID.

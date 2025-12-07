@@ -145,3 +145,22 @@ msgstr "Lista"
 
 msgid "menu_new_reminder"
 msgstr "Novi podsetnik"
+
+# Edit reminder
+msgid "edit_button"
+msgstr "Izmeni"
+
+msgid "edit_prompt"
+msgstr "✏️ *Izmena:* {reminder_text}\n\nOdgovori sa novim tekstom i/ili vremenom:\n• `Novi tekst 15:00` - promeni oba\n• `Novi tekst` - samo tekst\n• `15:00` - samo vreme"
+
+msgid "edit_cancelled"
+msgstr "Izmena otkazana"
+
+msgid "reminder_updated"
+msgstr "Podsetnik ažuriran ✓"
+
+msgid "edit_parse_error"
+msgstr "Nisam razumeo unos. Pokušaj ponovo ili pošalji /list za otkazivanje."
+
+msgid "edit_not_found"
+msgstr "Podsetnik nije pronađen ili je već obrisan."
