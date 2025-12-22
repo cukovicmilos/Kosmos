@@ -640,11 +640,15 @@ async def edit_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reminder_text = reminder['message_text']
     prompt = get_text("edit_prompt", user_lang).format(reminder_text=reminder_text)
 
-    await query.message.reply_text(
+    edit_prompt_message = await query.message.reply_text(
         prompt,
         parse_mode="Markdown",
         reply_markup=ForceReply(selective=True)
     )
+
+    # Store the edit prompt message ID so we can delete it after edit is complete
+    context.user_data['edit_prompt_message_id'] = edit_prompt_message.message_id
+    context.user_data['edit_prompt_chat_id'] = edit_prompt_message.chat_id
 
     logger.info(f"User {user_id} started editing reminder {reminder_id}")
 
@@ -677,7 +681,20 @@ async def edit_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     reminder = get_reminder_by_id(reminder_id)
     if not reminder or reminder['user_id'] != user_id:
         await update.message.reply_text(get_text("edit_not_found", user_lang))
+        # Clean up edit state and delete the edit prompt message
+        edit_prompt_message_id = context.user_data.get('edit_prompt_message_id')
+        edit_prompt_chat_id = context.user_data.get('edit_prompt_chat_id')
+        if edit_prompt_message_id and edit_prompt_chat_id:
+            try:
+                await context.bot.delete_message(
+                    chat_id=edit_prompt_chat_id,
+                    message_id=edit_prompt_message_id
+                )
+            except Exception as e:
+                logger.debug(f"Could not delete edit prompt message: {e}")
         context.user_data.pop('editing_reminder_id', None)
+        context.user_data.pop('edit_prompt_message_id', None)
+        context.user_data.pop('edit_prompt_chat_id', None)
         raise ApplicationHandlerStop  # Stop propagation to other handlers
 
     user_input = update.message.text.strip()
@@ -753,12 +770,37 @@ async def edit_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
         await update.message.reply_text(confirmation)
         logger.info(f"User {user_id} updated reminder {reminder_id}: text={new_text is not None}, time={new_time is not None}")
+
+        # Delete the edit prompt message to clean up the ForceReply UI
+        edit_prompt_message_id = context.user_data.get('edit_prompt_message_id')
+        edit_prompt_chat_id = context.user_data.get('edit_prompt_chat_id')
+        if edit_prompt_message_id and edit_prompt_chat_id:
+            try:
+                await context.bot.delete_message(
+                    chat_id=edit_prompt_chat_id,
+                    message_id=edit_prompt_message_id
+                )
+            except Exception as e:
+                logger.debug(f"Could not delete edit prompt message: {e}")
     else:
         await update.message.reply_text(get_text("error_occurred", user_lang))
+        # Also delete the edit prompt message on error
+        edit_prompt_message_id = context.user_data.get('edit_prompt_message_id')
+        edit_prompt_chat_id = context.user_data.get('edit_prompt_chat_id')
+        if edit_prompt_message_id and edit_prompt_chat_id:
+            try:
+                await context.bot.delete_message(
+                    chat_id=edit_prompt_chat_id,
+                    message_id=edit_prompt_message_id
+                )
+            except Exception as e:
+                logger.debug(f"Could not delete edit prompt message: {e}")
 
-    # Clear edit mode
+    # Clear edit mode and stored message IDs
     context.user_data.pop('editing_reminder_id', None)
-    
+    context.user_data.pop('edit_prompt_message_id', None)
+    context.user_data.pop('edit_prompt_chat_id', None)
+
     # Stop propagation to prevent reminder handler from creating a new reminder
     raise ApplicationHandlerStop
 
