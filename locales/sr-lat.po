@@ -164,3 +164,6 @@ msgstr "Nisam razumeo unos. Pokušaj ponovo ili pošalji /list za otkazivanje."
 
 msgid "edit_not_found"
 msgstr "Podsetnik nije pronađen ili je već obrisan."
+
+msgid "reminder_in_past"
+msgstr "Ne mogu da kreiram podsetnik u prošlosti. Izaberi datum i vreme u budućnosti."

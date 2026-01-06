@@ -4,12 +4,14 @@ Parses natural language time expressions in Serbian and English.
 
 Supported formats:
 - Days: sutra/tomorrow, prekosutra/dat, pon-ned/mon-sun
+- Dates: DD.MM.YYYY., DD.MM.YYYY, DD.MM., DD.MM, DD/MM/YYYY, DD/MM
 - Times: HH:MM, H, HAM/PM, HHMM military time
 
 Rules:
 1. Time must be at the end of the message
 2. If time has passed today, assume tomorrow
 3. Weekdays always mean next occurrence
+4. Dates without year assume current year (or next year if date has passed)
 """
 
 import re
@@ -58,6 +60,57 @@ WEEKDAY_KEYWORDS = {
     'saturday': 5,
     'sunday': 6,
 }
+
+
+def parse_date_string(date_str: str, current_time: datetime) -> Optional[datetime]:
+    """
+    Parse date string into datetime object.
+
+    Supported formats:
+    - DD.MM.YYYY. (Serbian format with trailing dot)
+    - DD.MM.YYYY (Serbian format without trailing dot)
+    - DD.MM. (day and month with trailing dot, assumes current/next year)
+    - DD.MM (day and month, assumes current/next year)
+    - DD/MM/YYYY (slash format)
+    - DD/MM (slash format, assumes current/next year)
+
+    Args:
+        date_str: Date string to parse
+        current_time: Current datetime for year inference
+
+    Returns:
+        Datetime object or None if parsing fails
+    """
+    date_str = date_str.strip().rstrip('.')  # Remove trailing dot if present
+
+    # Format: DD.MM.YYYY or DD/MM/YYYY
+    match = re.match(r'^(\d{1,2})[./](\d{1,2})[./](\d{4})$', date_str)
+    if match:
+        day = int(match.group(1))
+        month = int(match.group(2))
+        year = int(match.group(3))
+        try:
+            return current_time.replace(year=year, month=month, day=day, hour=0, minute=0, second=0, microsecond=0)
+        except ValueError:
+            return None
+
+    # Format: DD.MM or DD/MM (without year)
+    match = re.match(r'^(\d{1,2})[./](\d{1,2})$', date_str)
+    if match:
+        day = int(match.group(1))
+        month = int(match.group(2))
+        year = current_time.year
+        
+        try:
+            target_date = current_time.replace(year=year, month=month, day=day, hour=0, minute=0, second=0, microsecond=0)
+            # If the date has already passed this year, assume next year
+            if target_date.date() < current_time.date():
+                target_date = target_date.replace(year=year + 1)
+            return target_date
+        except ValueError:
+            return None
+
+    return None
 
 
 def parse_time_string(time_str: str) -> Optional[Tuple[int, int]]:
@@ -190,10 +243,11 @@ def parse_reminder(message: str, user_timezone: str = "Europe/Belgrade") -> Opti
         # Need at least: "text time" or "text day time"
         return None
 
-    # Try last 1-3 words as time/day+time
+    # Try last 1-3 words as time/day+time/date+time
     time_part = None
     day_offset = 0  # Days to add
     target_weekday = None  # Target weekday if specified
+    target_date = None  # Specific date if specified
     reminder_text = None
 
     # Try parsing last word as time
@@ -204,19 +258,26 @@ def parse_reminder(message: str, user_timezone: str = "Europe/Belgrade") -> Opti
         # Last word is time
         time_part = parsed_time
 
-        # Check if second-to-last word is a day keyword
+        # Check if second-to-last word is a day keyword or date
         if len(words) >= 2:
-            second_last = words[-2].lower()
+            second_last = words[-2]  # Keep original case for date parsing
+            second_last_lower = second_last.lower()
 
-            if second_last in DAY_KEYWORDS:
-                day_offset = DAY_KEYWORDS[second_last]
+            if second_last_lower in DAY_KEYWORDS:
+                day_offset = DAY_KEYWORDS[second_last_lower]
                 reminder_text = ' '.join(words[:-2])
-            elif second_last in WEEKDAY_KEYWORDS:
-                target_weekday = WEEKDAY_KEYWORDS[second_last]
+            elif second_last_lower in WEEKDAY_KEYWORDS:
+                target_weekday = WEEKDAY_KEYWORDS[second_last_lower]
                 reminder_text = ' '.join(words[:-2])
             else:
-                # No day keyword, just time
-                reminder_text = ' '.join(words[:-1])
+                # Try parsing as a date (e.g., 23.12.2025, 23.12., 23/12)
+                parsed_date = parse_date_string(second_last, now)
+                if parsed_date:
+                    target_date = parsed_date
+                    reminder_text = ' '.join(words[:-2])
+                else:
+                    # No day keyword or date, just time
+                    reminder_text = ' '.join(words[:-1])
         else:
             reminder_text = ' '.join(words[:-1])
     else:
@@ -230,23 +291,30 @@ def parse_reminder(message: str, user_timezone: str = "Europe/Belgrade") -> Opti
                 time_part = parsed_time
                 reminder_text = ' '.join(words[:-2])
             else:
-                # Try as "day time"
-                day_word = words[-2].lower()
+                # Try as "day time" or "date time"
+                day_word = words[-2]  # Keep original case for date parsing
+                day_word_lower = day_word.lower()
                 time_word = words[-1].lower()
 
                 parsed_time = parse_time_string(time_word)
                 if parsed_time:
                     time_part = parsed_time
 
-                    if day_word in DAY_KEYWORDS:
-                        day_offset = DAY_KEYWORDS[day_word]
+                    if day_word_lower in DAY_KEYWORDS:
+                        day_offset = DAY_KEYWORDS[day_word_lower]
                         reminder_text = ' '.join(words[:-2])
-                    elif day_word in WEEKDAY_KEYWORDS:
-                        target_weekday = WEEKDAY_KEYWORDS[day_word]
+                    elif day_word_lower in WEEKDAY_KEYWORDS:
+                        target_weekday = WEEKDAY_KEYWORDS[day_word_lower]
                         reminder_text = ' '.join(words[:-2])
                     else:
-                        # Not a recognized day, include it in reminder text
-                        reminder_text = ' '.join(words[:-1])
+                        # Try parsing as a date
+                        parsed_date = parse_date_string(day_word, now)
+                        if parsed_date:
+                            target_date = parsed_date
+                            reminder_text = ' '.join(words[:-2])
+                        else:
+                            # Not a recognized day or date, include it in reminder text
+                            reminder_text = ' '.join(words[:-1])
 
     if not time_part or not reminder_text:
         return None
@@ -254,7 +322,12 @@ def parse_reminder(message: str, user_timezone: str = "Europe/Belgrade") -> Opti
     hour, minute = time_part
 
     # Calculate scheduled datetime
-    if target_weekday is not None:
+    if target_date is not None:
+        # Specific date specified
+        scheduled_dt = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        # Make it timezone-aware
+        scheduled_dt = tz.localize(scheduled_dt) if scheduled_dt.tzinfo is None else scheduled_dt
+    elif target_weekday is not None:
         # Weekday specified - get next occurrence
         scheduled_dt = get_next_weekday(target_weekday, now)
         scheduled_dt = scheduled_dt.replace(hour=hour, minute=minute, second=0, microsecond=0)
@@ -335,6 +408,13 @@ if __name__ == "__main__":
         "Test 2100",
         "Something 7am",
         "Task prekosutra 9:00",
+        # Date format tests
+        "Sastanak 23.12.2025. 9:00",
+        "Rodjendan 15.01.2026 14:30",
+        "Meeting 25.12. 10:00",
+        "Event 31.12 18:00",
+        "Party 01/01/2026 20:00",
+        "Dinner 24/12 19:30",
     ]
 
     print("Testing time parser:\n")

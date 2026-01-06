@@ -164,3 +164,6 @@ msgstr "Couldn't understand the input. Please try again or send /list to cancel.
 
 msgid "edit_not_found"
 msgstr "Reminder not found or already deleted."
+
+msgid "reminder_in_past"
+msgstr "Cannot create a reminder in the past. Please choose a future date and time."

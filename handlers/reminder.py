@@ -72,6 +72,15 @@ async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_
 
         reminder_text, scheduled_time = result
 
+        # Validate that scheduled time is not in the past
+        now = datetime.now()
+        if scheduled_time <= now:
+            await update.message.reply_text(
+                get_text("reminder_in_past", user_lang)
+            )
+            logger.info(f"User {user_id} tried to create reminder in the past: {scheduled_time}")
+            return
+
         # Create reminder in database
         reminder_id = create_reminder(
             user_id=user_id,
