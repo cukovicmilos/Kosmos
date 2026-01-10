@@ -384,7 +384,15 @@ def get_pending_reminders() -> List[Dict[str, Any]]:
                 now_in_user_tz = datetime.now(tz).replace(tzinfo=None)
 
                 # Parse scheduled_time (stored as string in user's local time)
-                scheduled_time = datetime.strptime(reminder['scheduled_time'], '%Y-%m-%d %H:%M:%S')
+                # Handle various formats: with/without microseconds, with/without timezone
+                time_str = reminder['scheduled_time']
+                # Remove timezone info if present (e.g., "+01:00")
+                if '+' in time_str:
+                    time_str = time_str.split('+')[0]
+                # Remove microseconds if present
+                if '.' in time_str:
+                    time_str = time_str.split('.')[0]
+                scheduled_time = datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
 
                 # Check if reminder is due in user's timezone
                 if scheduled_time <= now_in_user_tz:

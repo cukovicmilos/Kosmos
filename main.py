@@ -19,7 +19,7 @@ from config import (
     TELEGRAM_POOL_TIMEOUT
 )
 from database import init_database
-from handlers import start, help as help_handler, reminder, postpone, list_handler, settings, recurring, netstats
+from handlers import start, help as help_handler, reminder, postpone, list_handler, settings, recurring
 from scheduler import start_scheduler
 
 # Try to import bot_stats for initial description update
@@ -42,7 +42,6 @@ async def post_init(application: Application) -> None:
     commands = [
         BotCommand("start", "Start the bot"),
         BotCommand("help", "Show help message"),
-        BotCommand("netstats", "Network statistics"),
         BotCommand("list", "View upcoming reminders"),
         BotCommand("recurring", "Create recurring reminder"),
         BotCommand("settings", "Change settings"),
@@ -91,7 +90,6 @@ def main():
     # Order matters! Commands should be registered before message handlers
     start.register_handlers(application)
     help_handler.register_handlers(application)
-    netstats.register_handlers(application)  # Network statistics command
     list_handler.register_handlers(application)  # List and delete commands
     settings.register_handlers(application)  # Settings command and callbacks
     recurring.register_handlers(application)  # Recurring reminder conversation

@@ -9,6 +9,5 @@ from . import postpone
 from . import list as list_handler
 from . import settings
 from . import recurring
-from . import netstats
 
-__all__ = ['start', 'help', 'reminder', 'postpone', 'list_handler', 'settings', 'recurring', 'netstats']
+__all__ = ['start', 'help', 'reminder', 'postpone', 'list_handler', 'settings', 'recurring']

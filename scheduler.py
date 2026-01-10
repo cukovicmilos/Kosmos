@@ -15,7 +15,6 @@ from telegram.error import NetworkError, TimedOut, TelegramError
 from database import get_pending_reminders, update_reminder_status, update_reminder_time
 from i18n import get_text
 from message_queue import process_pending_messages, cleanup_old_messages
-from network_monitor import record_network_timeout, record_network_success
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,13 @@ def calculate_next_occurrence(reminder: dict) -> datetime:
     Returns:
         Next scheduled datetime
     """
-    current_time = datetime.strptime(reminder['scheduled_time'], '%Y-%m-%d %H:%M:%S')
+    # Parse scheduled_time, handling microseconds and timezone if present
+    time_str = reminder['scheduled_time']
+    if '+' in time_str:
+        time_str = time_str.split('+')[0]
+    if '.' in time_str:
+        time_str = time_str.split('.')[0]
+    current_time = datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
     recurrence_type = reminder['recurrence_type']
 
     if recurrence_type == 'daily':
@@ -191,9 +196,6 @@ async def send_reminder(bot: Bot, reminder: dict):
             parse_mode="Markdown",
             reply_markup=reply_markup
         )
-        
-        # Record successful network operation
-        record_network_success(f"send_reminder_{reminder_id}")
 
         # Check if this is a recurring reminder
         is_recurring = reminder.get('is_recurring', 0)
@@ -211,8 +213,6 @@ async def send_reminder(bot: Bot, reminder: dict):
         logger.info(f"Reminder {reminder_id} sent to user {user_id}")
 
     except (NetworkError, TimedOut) as e:
-        # Network error - record timeout for monitoring
-        record_network_timeout(f"send_reminder_{reminder_id}", str(e))
         logger.warning(f"Network error sending reminder {reminder_id} to user {user_id}: {e}")
         # Don't update status - will retry next time
 

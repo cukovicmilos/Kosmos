@@ -146,7 +146,13 @@ def build_reminder_list_message(
                 try:
                     scheduled_dt = datetime.fromisoformat(scheduled_time_str)
                 except ValueError:
-                    scheduled_dt = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S")
+                    # Fallback: strip microseconds and timezone if present
+                    time_str = scheduled_time_str
+                    if '+' in time_str:
+                        time_str = time_str.split('+')[0]
+                    if '.' in time_str:
+                        time_str = time_str.split('.')[0]
+                    scheduled_dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
             else:
                 scheduled_dt = scheduled_time_str
 
