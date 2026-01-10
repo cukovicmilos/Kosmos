@@ -10,6 +10,7 @@ import pytz
 
 from database import create_user, get_user
 from i18n import get_text
+from config import TIMEZONE_OPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -96,40 +97,13 @@ async def ask_timezone_selection(update: Update, context: ContextTypes.DEFAULT_T
     Ask user to select their timezone.
     Displays a list of common timezones.
     """
-    # Common timezones organized by region
-    timezones = [
-        # Europe
-        ("🇷🇸 Europe/Belgrade", "Europe/Belgrade"),
-        ("🇬🇧 Europe/London", "Europe/London"),
-        ("🇩🇪 Europe/Berlin", "Europe/Berlin"),
-        ("🇫🇷 Europe/Paris", "Europe/Paris"),
-        ("🇮🇹 Europe/Rome", "Europe/Rome"),
-        ("🇪🇸 Europe/Madrid", "Europe/Madrid"),
-        ("🇷🇺 Europe/Moscow", "Europe/Moscow"),
-        # Americas
-        ("🇺🇸 America/New_York", "America/New_York"),
-        ("🇺🇸 America/Chicago", "America/Chicago"),
-        ("🇺🇸 America/Denver", "America/Denver"),
-        ("🇺🇸 America/Los_Angeles", "America/Los_Angeles"),
-        ("🇨🇦 America/Toronto", "America/Toronto"),
-        ("🇧🇷 America/Sao_Paulo", "America/Sao_Paulo"),
-        # Asia
-        ("🇨🇳 Asia/Shanghai", "Asia/Shanghai"),
-        ("🇯🇵 Asia/Tokyo", "Asia/Tokyo"),
-        ("🇮🇳 Asia/Kolkata", "Asia/Kolkata"),
-        ("🇦🇪 Asia/Dubai", "Asia/Dubai"),
-        # Australia
-        ("🇦🇺 Australia/Sydney", "Australia/Sydney"),
-        ("🇦🇺 Australia/Melbourne", "Australia/Melbourne"),
-    ]
-
-    # Create inline keyboard with timezone options (2 per row)
+    # Create inline keyboard with timezone options (2 per row) using TIMEZONE_OPTIONS from config
     keyboard = []
-    for i in range(0, len(timezones), 2):
+    for i in range(0, len(TIMEZONE_OPTIONS), 2):
         row = []
         for j in range(2):
-            if i + j < len(timezones):
-                label, tz = timezones[i + j]
+            if i + j < len(TIMEZONE_OPTIONS):
+                label, tz = TIMEZONE_OPTIONS[i + j]
                 row.append(InlineKeyboardButton(
                     label,
                     callback_data=f"tz_{tz}"

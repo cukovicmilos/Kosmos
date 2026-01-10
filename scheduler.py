@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Bot
+from telegram.error import NetworkError, TimedOut, TelegramError
 
 from database import get_pending_reminders, update_reminder_status, update_reminder_time
 from i18n import get_text
@@ -209,15 +210,21 @@ async def send_reminder(bot: Bot, reminder: dict):
 
         logger.info(f"Reminder {reminder_id} sent to user {user_id}")
 
+    except (NetworkError, TimedOut) as e:
+        # Network error - record timeout for monitoring
+        record_network_timeout(f"send_reminder_{reminder_id}", str(e))
+        logger.warning(f"Network error sending reminder {reminder_id} to user {user_id}: {e}")
+        # Don't update status - will retry next time
+
+    except TelegramError as e:
+        # Other Telegram error (user blocked bot, invalid chat, etc.)
+        logger.error(f"Telegram error sending reminder {reminder_id} to user {user_id}: {e}")
+        # Don't update status - will retry next time
+
     except Exception as e:
-        error_msg = str(e)
-        
-        # Check if this is a timeout error
-        if 'timeout' in error_msg.lower() or 'timed out' in error_msg.lower():
-            record_network_timeout(f"send_reminder_{reminder_id}", error_msg)
-        
-        logger.error(f"Failed to send reminder {reminder_id} to user {user_id}: {e}", exc_info=True)
-        # Don't update status if sending failed - will retry next time
+        # Unexpected error
+        logger.error(f"Unexpected error sending reminder {reminder_id} to user {user_id}: {e}", exc_info=True)
+        # Don't update status - will retry next time
 
 
 def start_scheduler(bot: Bot):

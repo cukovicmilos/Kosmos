@@ -373,6 +373,50 @@ def format_datetime(dt: datetime, language: str = "en", time_format: str = "24h"
     return f"{date_str} {time_str}"
 
 
+def format_reminder_confirmation(
+    reminder_text: str,
+    scheduled_time: datetime,
+    time_format: str = "24h",
+    now: datetime = None,
+    prefix: str = "✓"
+) -> str:
+    """
+    Format reminder confirmation message.
+
+    Shows only time if scheduled for today, otherwise shows full date.
+
+    Args:
+        reminder_text: The reminder message text
+        scheduled_time: When the reminder is scheduled (naive datetime in user's timezone)
+        time_format: User's time format preference (12h, 24h)
+        now: Current time for comparison (defaults to datetime.now())
+        prefix: Prefix character/emoji (default "✓", use "⏰" for postpone)
+
+    Returns:
+        Formatted confirmation string like "✓ reminder > 15:00" or "✓ reminder > Mon 15.01.2024. 15:00"
+    """
+    if now is None:
+        now = datetime.now()
+
+    now_date = now.date()
+    scheduled_date = scheduled_time.date()
+
+    # Format time based on user preference
+    if time_format == "12h":
+        time_str = scheduled_time.strftime("%I:%M %p")
+    else:
+        time_str = scheduled_time.strftime("%H:%M")
+
+    if now_date == scheduled_date:
+        # Today - show only time
+        return f"{prefix} {reminder_text} > {time_str}"
+    else:
+        # Another day - show day abbreviation, date and time
+        day_abbr = scheduled_time.strftime("%a")
+        date_str = scheduled_time.strftime("%d.%m.%Y.")
+        return f"{prefix} {reminder_text} > {day_abbr} {date_str} {time_str}"
+
+
 def parse_time(time_str: str) -> Optional['datetime.time']:
     """
     Parse time string into datetime.time object.

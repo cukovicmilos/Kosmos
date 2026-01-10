@@ -27,4 +27,12 @@ You MUST read the overview resource to understand the complete workflow. The inf
 </CRITICAL_INSTRUCTION>
 
 <!-- BACKLOG.MD MCP GUIDELINES END -->
+
+## STATE MACHINE MANAGEMENT
+
+**CRITICAL WORKFLOW REQUIREMENTS**
+
+1. **Before any code change**: Read and understand `State_Machine.md` to comprehend the current state machines and component interactions
+2. **After code change**: Update `State_Machine.md` if the change affects any state machine, component interaction, or introduces new states/transitions
+
 - zapamti komade za ovaj bot servis

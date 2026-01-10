@@ -5,6 +5,7 @@ Processes user messages to create reminders.
 
 import logging
 from datetime import datetime
+import pytz
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 from telegram.error import NetworkError, TimedOut
@@ -72,8 +73,12 @@ async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_
 
         reminder_text, scheduled_time = result
 
-        # Validate that scheduled time is not in the past
-        now = datetime.now()
+        # Validate that scheduled time is not in the past (using user's timezone)
+        try:
+            tz = pytz.timezone(user_timezone)
+        except pytz.UnknownTimeZoneError:
+            tz = pytz.timezone("Europe/Belgrade")
+        now = datetime.now(tz).replace(tzinfo=None)  # Naive datetime in user's timezone
         if scheduled_time <= now:
             await update.message.reply_text(
                 get_text("reminder_in_past", user_lang)
@@ -90,8 +95,8 @@ async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_
 
         if reminder_id:
             # Success - prepare confirmation message
-            # Check if scheduled time is today
-            now_date = datetime.now().date()
+            # Check if scheduled time is today (in user's timezone)
+            now_date = now.date()  # Already in user's timezone from earlier
             scheduled_date = scheduled_time.date()
 
             if now_date == scheduled_date:

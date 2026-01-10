@@ -184,6 +184,34 @@ def get_user(telegram_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 
+def get_user_preferences(telegram_id: int) -> Dict[str, str]:
+    """
+    Get user preferences with defaults.
+
+    Args:
+        telegram_id: Telegram user ID
+
+    Returns:
+        Dict with keys: language, timezone, time_format
+        Returns defaults if user not found or on error
+    """
+    defaults = {
+        'language': 'en',
+        'timezone': 'Europe/Belgrade',
+        'time_format': '24h'
+    }
+
+    user = get_user(telegram_id)
+    if not user:
+        return defaults
+
+    return {
+        'language': user.get('language', defaults['language']),
+        'timezone': user.get('timezone', defaults['timezone']),
+        'time_format': user.get('time_format', defaults['time_format'])
+    }
+
+
 def update_user_language(telegram_id: int, language: str) -> bool:
     """Update user's language preference."""
     try:
@@ -314,26 +342,55 @@ def get_user_reminders(user_id: int, status: str = "pending") -> List[Dict[str, 
 
 def get_pending_reminders() -> List[Dict[str, Any]]:
     """
-    Get all pending reminders that are due (scheduled_time <= now).
+    Get all pending reminders that are due (scheduled_time <= now in user's timezone).
+
+    The scheduled_time is stored as naive datetime in the user's local timezone.
+    We must compare it with the current time in each user's timezone to correctly
+    determine if a reminder is due.
 
     Returns:
         List of reminders as dictionaries
     """
+    import pytz
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            # Use datetime.now() to get local time, which matches how scheduled_time is stored
-            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            # Fetch all pending reminders - we'll filter by timezone in Python
+            # This is necessary because each user may have a different timezone
             cursor.execute("""
                 SELECT r.*, u.timezone
                 FROM reminders r
                 JOIN users u ON r.user_id = u.telegram_id
-                WHERE r.status = 'pending' AND datetime(r.scheduled_time) <= datetime(?)
+                WHERE r.status = 'pending'
                 ORDER BY r.scheduled_time ASC
-            """, (current_time,))
+                LIMIT 1000
+            """)
 
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+
+            # Filter reminders that are due in each user's timezone
+            due_reminders = []
+            for row in rows:
+                reminder = dict(row)
+                user_timezone = reminder.get('timezone', 'Europe/Belgrade')
+
+                try:
+                    tz = pytz.timezone(user_timezone)
+                except pytz.UnknownTimeZoneError:
+                    tz = pytz.timezone('Europe/Belgrade')
+
+                # Get current time in user's timezone (as naive datetime for comparison)
+                now_in_user_tz = datetime.now(tz).replace(tzinfo=None)
+
+                # Parse scheduled_time (stored as string in user's local time)
+                scheduled_time = datetime.strptime(reminder['scheduled_time'], '%Y-%m-%d %H:%M:%S')
+
+                # Check if reminder is due in user's timezone
+                if scheduled_time <= now_in_user_tz:
+                    due_reminders.append(reminder)
+
+            return due_reminders
     except Exception as e:
         logger.error(f"Error getting pending reminders: {e}")
         return []

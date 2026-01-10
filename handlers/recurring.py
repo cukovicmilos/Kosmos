@@ -6,6 +6,7 @@ Handles /recurring command with conversation flow for creating recurring reminde
 import json
 import logging
 from datetime import datetime, time
+import pytz
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ContextTypes,
@@ -371,14 +372,25 @@ async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE
     message = rec_data['message']
     reminder_time = rec_data['time']
 
-    # Calculate first occurrence
+    # Calculate first occurrence (using user's timezone)
     from datetime import timedelta
-    now = datetime.now()
+    try:
+        tz = pytz.timezone(user_tz)
+    except pytz.UnknownTimeZoneError:
+        tz = pytz.timezone("Europe/Belgrade")
+    now = datetime.now(tz).replace(tzinfo=None)  # Naive datetime in user's timezone
 
     # For interval type, first occurrence is X days from now
     if rec_type == "interval":
         interval = rec_data['interval']
-        scheduled_datetime = datetime.combine(now.date(), reminder_time) + timedelta(days=interval)
+        # Check if today's time is still valid, otherwise add interval days
+        base_time = datetime.combine(now.date(), reminder_time)
+        if base_time <= now:
+            # Today's time has passed, schedule for interval days from tomorrow
+            scheduled_datetime = base_time + timedelta(days=interval)
+        else:
+            # Today's time is still valid, but for interval we start from interval days
+            scheduled_datetime = base_time + timedelta(days=interval)
     else:
         # For other types: today or tomorrow based on time
         scheduled_datetime = datetime.combine(now.date(), reminder_time)

@@ -7,8 +7,7 @@ import json
 import logging
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
-from telegram.ext._application import ApplicationHandlerStop
+from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ConversationHandler
 import pytz
 
 from database import get_user_reminders, delete_reminder, get_user, get_reminder_by_id, update_reminder
@@ -18,6 +17,29 @@ from telegram.helpers import escape_markdown
 from telegram import ForceReply
 
 logger = logging.getLogger(__name__)
+
+# Conversation states for edit flow
+AWAITING_EDIT_INPUT = 0
+
+
+async def _cleanup_edit_state(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Clean up edit-related state and delete the edit prompt message if present."""
+    edit_prompt_message_id = context.user_data.get('edit_prompt_message_id')
+    edit_prompt_chat_id = context.user_data.get('edit_prompt_chat_id')
+
+    if edit_prompt_message_id and edit_prompt_chat_id:
+        try:
+            await context.bot.delete_message(
+                chat_id=edit_prompt_chat_id,
+                message_id=edit_prompt_message_id
+            )
+        except Exception as e:
+            logger.debug(f"Could not delete edit prompt message: {e}")
+
+    # Clear all edit-related state
+    context.user_data.pop('editing_reminder_id', None)
+    context.user_data.pop('edit_prompt_message_id', None)
+    context.user_data.pop('edit_prompt_chat_id', None)
 
 
 def format_recurrence_description(reminder: dict, language: str = "en") -> str:
@@ -90,6 +112,99 @@ def format_recurrence_description(reminder: dict, language: str = "en") -> str:
     return ""
 
 
+def build_reminder_list_message(
+    reminders: list,
+    user_lang: str,
+    user_timezone: str,
+    user_time_format: str
+) -> tuple:
+    """
+    Build the reminder list message text and inline keyboard.
+
+    Args:
+        reminders: List of reminder dicts from database
+        user_lang: User's language (en, sr-lat)
+        user_timezone: User's timezone
+        user_time_format: User's time format (12h, 24h)
+
+    Returns:
+        Tuple of (message_text, reply_markup)
+    """
+    message_text = get_text("list_header", user_lang) + "\n"
+
+    # Timezone for formatting
+    tz = pytz.timezone(user_timezone)
+
+    for index, reminder in enumerate(reminders, 1):
+        reminder_id = reminder['id']
+        reminder_text = reminder['message_text']
+        scheduled_time_str = reminder['scheduled_time']
+
+        # Parse scheduled_time from database (stored as local time naive datetime)
+        try:
+            if isinstance(scheduled_time_str, str):
+                try:
+                    scheduled_dt = datetime.fromisoformat(scheduled_time_str)
+                except ValueError:
+                    scheduled_dt = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S")
+            else:
+                scheduled_dt = scheduled_time_str
+
+            # If naive datetime, treat it as local time (already in correct timezone)
+            if scheduled_dt.tzinfo is None:
+                scheduled_dt_local = tz.localize(scheduled_dt)
+            else:
+                scheduled_dt_local = scheduled_dt.astimezone(tz)
+
+            # Format date and time
+            date_str = scheduled_dt_local.strftime("%d.%m.%Y.")
+            if user_time_format == "12h":
+                time_str = scheduled_dt_local.strftime("%I:%M %p")
+            else:
+                time_str = scheduled_dt_local.strftime("%H:%M")
+
+            # Add to message
+            separator = "u" if user_lang == "sr-lat" else "at"
+
+            # Check if recurring and add icon + description
+            is_recurring = reminder.get('is_recurring', 0)
+            if is_recurring:
+                recurrence_desc = format_recurrence_description(reminder, user_lang)
+                recurring_icon = "🔁 "
+                recurrence_info = f" ({recurrence_desc})" if recurrence_desc else ""
+            else:
+                recurring_icon = ""
+                recurrence_info = ""
+
+            # Escape markdown characters in user text
+            safe_reminder_text = escape_markdown(reminder_text, version=1)
+            message_text += f"\n{index}. {recurring_icon}{safe_reminder_text}{recurrence_info}\n"
+            message_text += f"   {date_str} {separator} {time_str}\n"
+
+        except Exception as e:
+            logger.error(f"Error formatting reminder {reminder['id']}: {e}", exc_info=True)
+            safe_reminder_text = escape_markdown(reminder_text, version=1)
+            message_text += f"\n{index}. {safe_reminder_text}\n"
+            message_text += f"   {scheduled_time_str}\n"
+
+    # Create inline keyboard with Delete and Edit buttons
+    keyboard = []
+    for index, reminder in enumerate(reminders, 1):
+        delete_button = InlineKeyboardButton(
+            f"🗑️ Obriši #{index}" if user_lang == "sr-lat" else f"🗑️ Delete #{index}",
+            callback_data=f"delete_{reminder['id']}"
+        )
+        edit_button = InlineKeyboardButton(
+            f"✏️ Izmeni #{index}" if user_lang == "sr-lat" else f"✏️ Edit #{index}",
+            callback_data=f"edit_{reminder['id']}"
+        )
+        keyboard.append([delete_button, edit_button])
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    return message_text, reply_markup
+
+
 async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Handle /list command.
@@ -120,81 +235,10 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Build message with reminders
-    message_text = get_text("list_header", user_lang) + "\n"
-
-    # Timezone for formatting
-    tz = pytz.timezone(user_timezone)
-
-    for index, reminder in enumerate(reminders, 1):
-        reminder_id = reminder['id']
-        reminder_text = reminder['message_text']
-        scheduled_time_str = reminder['scheduled_time']
-
-        # Parse scheduled_time from database (stored as local time naive datetime)
-        # SQLite stores datetime as string
-        try:
-            if isinstance(scheduled_time_str, str):
-                # Parse as naive datetime (no timezone)
-                try:
-                    scheduled_dt = datetime.fromisoformat(scheduled_time_str)
-                except:
-                    scheduled_dt = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S")
-            else:
-                scheduled_dt = scheduled_time_str
-
-            # If naive datetime, treat it as local time (already in correct timezone)
-            if scheduled_dt.tzinfo is None:
-                scheduled_dt_local = tz.localize(scheduled_dt)
-            else:
-                scheduled_dt_local = scheduled_dt.astimezone(tz)
-
-            # Format date and time
-            date_str = scheduled_dt_local.strftime("%d.%m.%Y.")
-            if user_time_format == "12h":
-                time_str = scheduled_dt_local.strftime("%I:%M %p")
-            else:
-                time_str = scheduled_dt_local.strftime("%H:%M")
-
-            # Add to message - use index for display, but keep database ID for deletion
-            separator = "u" if user_lang == "sr-lat" else "at"
-
-            # Check if recurring and add icon + description
-            is_recurring = reminder.get('is_recurring', 0)
-            if is_recurring:
-                recurrence_desc = format_recurrence_description(reminder, user_lang)
-                recurring_icon = "🔁 "
-                recurrence_info = f" ({recurrence_desc})" if recurrence_desc else ""
-            else:
-                recurring_icon = ""
-                recurrence_info = ""
-
-            # Escape markdown characters in user text
-            safe_reminder_text = escape_markdown(reminder_text, version=1)
-            message_text += f"\n{index}. {recurring_icon}{safe_reminder_text}{recurrence_info}\n"
-            message_text += f"   {date_str} {separator} {time_str}\n"
-
-        except Exception as e:
-            logger.error(f"Error formatting reminder {reminder['id']}: {e}", exc_info=True)
-            safe_reminder_text = escape_markdown(reminder_text, version=1)
-            message_text += f"\n{index}. {safe_reminder_text}\n"
-            message_text += f"   {scheduled_time_str}\n"
-
-    # Create inline keyboard with Delete and Edit buttons
-    # Use index (1, 2, 3...) in button text, but database ID in callback_data
-    keyboard = []
-    for index, reminder in enumerate(reminders, 1):
-        delete_button = InlineKeyboardButton(
-            f"🗑️ Obriši #{index}" if user_lang == "sr-lat" else f"🗑️ Delete #{index}",
-            callback_data=f"delete_{reminder['id']}"
-        )
-        edit_button = InlineKeyboardButton(
-            f"✏️ Izmeni #{index}" if user_lang == "sr-lat" else f"✏️ Edit #{index}",
-            callback_data=f"edit_{reminder['id']}"
-        )
-        keyboard.append([delete_button, edit_button])
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    # Build message with reminders using helper function
+    message_text, reply_markup = build_reminder_list_message(
+        reminders, user_lang, user_timezone, user_time_format
+    )
 
     # Send message
     await update.message.reply_text(
@@ -297,76 +341,13 @@ async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.info(f"User {user_id} deleted last reminder")
             return
 
-        # Rebuild message
+        # Rebuild message using helper function
         user_timezone = user.get("timezone", "Europe/Belgrade")
         user_time_format = user.get("time_format", "24h")
 
-        message_text = get_text("list_header", user_lang) + "\n"
-        tz = pytz.timezone(user_timezone)
-
-        for index, reminder in enumerate(reminders, 1):
-            reminder_id = reminder['id']
-            reminder_text = reminder['message_text']
-            scheduled_time_str = reminder['scheduled_time']
-
-            try:
-                if isinstance(scheduled_time_str, str):
-                    try:
-                        scheduled_dt = datetime.fromisoformat(scheduled_time_str)
-                    except:
-                        scheduled_dt = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S")
-                else:
-                    scheduled_dt = scheduled_time_str
-
-                # If naive datetime, treat it as local time (already in correct timezone)
-                if scheduled_dt.tzinfo is None:
-                    scheduled_dt_local = tz.localize(scheduled_dt)
-                else:
-                    scheduled_dt_local = scheduled_dt.astimezone(tz)
-
-                date_str = scheduled_dt_local.strftime("%d.%m.%Y.")
-                if user_time_format == "12h":
-                    time_str = scheduled_dt_local.strftime("%I:%M %p")
-                else:
-                    time_str = scheduled_dt_local.strftime("%H:%M")
-
-                separator = "u" if user_lang == "sr-lat" else "at"
-
-                # Check if recurring and add icon + description
-                is_recurring = reminder.get('is_recurring', 0)
-                if is_recurring:
-                    recurrence_desc = format_recurrence_description(reminder, user_lang)
-                    recurring_icon = "🔁 "
-                    recurrence_info = f" ({recurrence_desc})" if recurrence_desc else ""
-                else:
-                    recurring_icon = ""
-                    recurrence_info = ""
-
-                # Escape markdown characters in user text
-                safe_reminder_text = escape_markdown(reminder_text, version=1)
-                message_text += f"\n{index}. {recurring_icon}{safe_reminder_text}{recurrence_info}\n"
-                message_text += f"   {date_str} {separator} {time_str}\n"
-
-            except Exception as e:
-                logger.error(f"Error formatting reminder {reminder['id']}: {e}", exc_info=True)
-                safe_reminder_text = escape_markdown(reminder_text, version=1)
-                message_text += f"\n{index}. {safe_reminder_text}\n"
-                message_text += f"   {scheduled_time_str}\n"
-
-        # Rebuild keyboard - use index for button text, database ID for callback
-        keyboard = []
-        for index, reminder in enumerate(reminders, 1):
-            delete_button = InlineKeyboardButton(
-                f"🗑️ Obriši #{index}" if user_lang == "sr-lat" else f"🗑️ Delete #{index}",
-                callback_data=f"delete_{reminder['id']}"
-            )
-            edit_button = InlineKeyboardButton(
-                f"✏️ Izmeni #{index}" if user_lang == "sr-lat" else f"✏️ Edit #{index}",
-                callback_data=f"edit_{reminder['id']}"
-            )
-            keyboard.append([delete_button, edit_button])
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        message_text, reply_markup = build_reminder_list_message(
+            reminders, user_lang, user_timezone, user_time_format
+        )
 
         # Update message
         await query.edit_message_text(
@@ -426,71 +407,13 @@ async def delete_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
             logger.info(f"User {user_id} deleted last recurring reminder")
             return
 
-        # Rebuild the list (same code as in delete_callback)
+        # Rebuild the list using helper function
         user_timezone = user.get("timezone", "Europe/Belgrade")
         user_time_format = user.get("time_format", "24h")
-        message_text = get_text("list_header", user_lang) + "\n"
-        tz = pytz.timezone(user_timezone)
 
-        for index, reminder in enumerate(reminders, 1):
-            reminder_text = reminder['message_text']
-            scheduled_time_str = reminder['scheduled_time']
-
-            try:
-                if isinstance(scheduled_time_str, str):
-                    try:
-                        scheduled_dt = datetime.fromisoformat(scheduled_time_str)
-                    except:
-                        scheduled_dt = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S")
-                else:
-                    scheduled_dt = scheduled_time_str
-
-                if scheduled_dt.tzinfo is None:
-                    scheduled_dt_local = tz.localize(scheduled_dt)
-                else:
-                    scheduled_dt_local = scheduled_dt.astimezone(tz)
-
-                date_str = scheduled_dt_local.strftime("%d.%m.%Y.")
-                if user_time_format == "12h":
-                    time_str = scheduled_dt_local.strftime("%I:%M %p")
-                else:
-                    time_str = scheduled_dt_local.strftime("%H:%M")
-
-                separator = "u" if user_lang == "sr-lat" else "at"
-
-                is_recurring = reminder.get('is_recurring', 0)
-                if is_recurring:
-                    recurrence_desc = format_recurrence_description(reminder, user_lang)
-                    recurring_icon = "🔁 "
-                    recurrence_info = f" ({recurrence_desc})" if recurrence_desc else ""
-                else:
-                    recurring_icon = ""
-                    recurrence_info = ""
-
-                # Escape markdown characters in user text
-                safe_reminder_text = escape_markdown(reminder_text, version=1)
-                message_text += f"\n{index}. {recurring_icon}{safe_reminder_text}{recurrence_info}\n"
-                message_text += f"   {date_str} {separator} {time_str}\n"
-
-            except Exception as e:
-                logger.error(f"Error formatting reminder {reminder['id']}: {e}", exc_info=True)
-                safe_reminder_text = escape_markdown(reminder_text, version=1)
-                message_text += f"\n{index}. {safe_reminder_text}\n"
-                message_text += f"   {scheduled_time_str}\n"
-
-        keyboard = []
-        for index, reminder in enumerate(reminders, 1):
-            delete_button = InlineKeyboardButton(
-                f"🗑️ Obriši #{index}" if user_lang == "sr-lat" else f"🗑️ Delete #{index}",
-                callback_data=f"delete_{reminder['id']}"
-            )
-            edit_button = InlineKeyboardButton(
-                f"✏️ Izmeni #{index}" if user_lang == "sr-lat" else f"✏️ Edit #{index}",
-                callback_data=f"edit_{reminder['id']}"
-            )
-            keyboard.append([delete_button, edit_button])
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        message_text, reply_markup = build_reminder_list_message(
+            reminders, user_lang, user_timezone, user_time_format
+        )
 
         await query.edit_message_text(
             message_text,
@@ -526,68 +449,9 @@ async def delete_cancel_callback(update: Update, context: ContextTypes.DEFAULT_T
         )
         return
 
-    message_text = get_text("list_header", user_lang) + "\n"
-    tz = pytz.timezone(user_timezone)
-
-    for index, reminder in enumerate(reminders, 1):
-        reminder_text = reminder['message_text']
-        scheduled_time_str = reminder['scheduled_time']
-
-        try:
-            if isinstance(scheduled_time_str, str):
-                try:
-                    scheduled_dt = datetime.fromisoformat(scheduled_time_str)
-                except:
-                    scheduled_dt = datetime.strptime(scheduled_time_str, "%Y-%m-%d %H:%M:%S")
-            else:
-                scheduled_dt = scheduled_time_str
-
-            if scheduled_dt.tzinfo is None:
-                scheduled_dt_local = tz.localize(scheduled_dt)
-            else:
-                scheduled_dt_local = scheduled_dt.astimezone(tz)
-
-            date_str = scheduled_dt_local.strftime("%d.%m.%Y.")
-            if user_time_format == "12h":
-                time_str = scheduled_dt_local.strftime("%I:%M %p")
-            else:
-                time_str = scheduled_dt_local.strftime("%H:%M")
-
-            separator = "u" if user_lang == "sr-lat" else "at"
-
-            is_recurring = reminder.get('is_recurring', 0)
-            if is_recurring:
-                recurrence_desc = format_recurrence_description(reminder, user_lang)
-                recurring_icon = "🔁 "
-                recurrence_info = f" ({recurrence_desc})" if recurrence_desc else ""
-            else:
-                recurring_icon = ""
-                recurrence_info = ""
-
-            # Escape markdown characters in user text
-            safe_reminder_text = escape_markdown(reminder_text, version=1)
-            message_text += f"\n{index}. {recurring_icon}{safe_reminder_text}{recurrence_info}\n"
-            message_text += f"   {date_str} {separator} {time_str}\n"
-
-        except Exception as e:
-            logger.error(f"Error formatting reminder {reminder['id']}: {e}", exc_info=True)
-            safe_reminder_text = escape_markdown(reminder_text, version=1)
-            message_text += f"\n{index}. {safe_reminder_text}\n"
-            message_text += f"   {scheduled_time_str}\n"
-
-    keyboard = []
-    for index, reminder in enumerate(reminders, 1):
-        delete_button = InlineKeyboardButton(
-            f"🗑️ Obriši #{index}" if user_lang == "sr-lat" else f"🗑️ Delete #{index}",
-            callback_data=f"delete_{reminder['id']}"
-        )
-        edit_button = InlineKeyboardButton(
-            f"✏️ Izmeni #{index}" if user_lang == "sr-lat" else f"✏️ Edit #{index}",
-            callback_data=f"edit_{reminder['id']}"
-        )
-        keyboard.append([delete_button, edit_button])
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    message_text, reply_markup = build_reminder_list_message(
+        reminders, user_lang, user_timezone, user_time_format
+    )
 
     await query.edit_message_text(
         message_text,
@@ -598,7 +462,7 @@ async def delete_cancel_callback(update: Update, context: ContextTypes.DEFAULT_T
 
 async def edit_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Handle edit button callback.
+    Handle edit button callback (ConversationHandler entry point).
     Shows edit prompt with ForceReply to capture user's new text/time.
     """
     query = update.callback_query
@@ -606,14 +470,14 @@ async def edit_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     callback_data = query.data
     if not callback_data.startswith("edit_"):
-        return
+        return ConversationHandler.END
 
     # Extract reminder_id
     try:
         reminder_id = int(callback_data.split("_")[1])
     except (IndexError, ValueError):
         logger.error(f"Invalid edit callback data: {callback_data}")
-        return
+        return ConversationHandler.END
 
     user_id = update.effective_user.id
 
@@ -626,12 +490,12 @@ async def edit_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not reminder:
         await query.answer(get_text("edit_not_found", user_lang), show_alert=True)
-        return
+        return ConversationHandler.END
 
     # Check if reminder belongs to this user
     if reminder['user_id'] != user_id:
         logger.warning(f"User {user_id} tried to edit reminder {reminder_id} that doesn't belong to them")
-        return
+        return ConversationHandler.END
 
     # Store reminder_id in user_data for the message handler
     context.user_data['editing_reminder_id'] = reminder_id
@@ -651,25 +515,23 @@ async def edit_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['edit_prompt_chat_id'] = edit_prompt_message.chat_id
 
     logger.info(f"User {user_id} started editing reminder {reminder_id}")
+    return AWAITING_EDIT_INPUT
 
 
 async def edit_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Handle user's reply with new reminder text/time.
+    Handle user's reply with new reminder text/time (ConversationHandler state handler).
     Parses input to determine if user wants to change text, time, or both.
-    
-    Returns True if message was handled (to stop propagation to other handlers).
     """
-    # Check if this is a reply to our edit prompt
-    if not update.message or not update.message.reply_to_message:
-        return None  # Let other handlers process
+    import re
 
     user_id = update.effective_user.id
 
-    # Check if user is in edit mode
+    # Get reminder_id from conversation state
     reminder_id = context.user_data.get('editing_reminder_id')
     if not reminder_id:
-        return None  # Not in edit mode, let other handlers process this
+        await _cleanup_edit_state(context)
+        return ConversationHandler.END
 
     # Get user settings
     user = get_user(user_id)
@@ -681,31 +543,16 @@ async def edit_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     reminder = get_reminder_by_id(reminder_id)
     if not reminder or reminder['user_id'] != user_id:
         await update.message.reply_text(get_text("edit_not_found", user_lang))
-        # Clean up edit state and delete the edit prompt message
-        edit_prompt_message_id = context.user_data.get('edit_prompt_message_id')
-        edit_prompt_chat_id = context.user_data.get('edit_prompt_chat_id')
-        if edit_prompt_message_id and edit_prompt_chat_id:
-            try:
-                await context.bot.delete_message(
-                    chat_id=edit_prompt_chat_id,
-                    message_id=edit_prompt_message_id
-                )
-            except Exception as e:
-                logger.debug(f"Could not delete edit prompt message: {e}")
-        context.user_data.pop('editing_reminder_id', None)
-        context.user_data.pop('edit_prompt_message_id', None)
-        context.user_data.pop('edit_prompt_chat_id', None)
-        raise ApplicationHandlerStop  # Stop propagation to other handlers
+        await _cleanup_edit_state(context)
+        return ConversationHandler.END
 
     user_input = update.message.text.strip()
 
     # Try to parse input
-    # Strategy: 
+    # Strategy:
     # 1. If input looks like only time (e.g., "15:00", "3pm", "tue 15:00"), update only time
     # 2. If input has text + time, update both
     # 3. If input has no recognizable time, update only text
-
-    import re
 
     # Check if input is ONLY a time pattern (no other text)
     time_only_patterns = [
@@ -728,7 +575,7 @@ async def edit_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             _, new_time = result
         else:
             await update.message.reply_text(get_text("edit_parse_error", user_lang))
-            raise ApplicationHandlerStop  # Keep in edit mode, but stop propagation
+            return AWAITING_EDIT_INPUT  # Keep in edit mode, let user retry
     else:
         # Try to parse as full reminder (text + time)
         result = parse_reminder(user_input, user_timezone)
@@ -747,8 +594,9 @@ async def edit_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         final_text = new_text if new_text else reminder['message_text']
 
         if new_time:
-            # Format the time for display
-            now_date = datetime.now().date()
+            # Format the time for display (using user's timezone)
+            tz = pytz.timezone(user_timezone)
+            now_date = datetime.now(tz).date()
             new_time_date = new_time.date()
 
             if now_date == new_time_date:
@@ -770,39 +618,24 @@ async def edit_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 
         await update.message.reply_text(confirmation)
         logger.info(f"User {user_id} updated reminder {reminder_id}: text={new_text is not None}, time={new_time is not None}")
-
-        # Delete the edit prompt message to clean up the ForceReply UI
-        edit_prompt_message_id = context.user_data.get('edit_prompt_message_id')
-        edit_prompt_chat_id = context.user_data.get('edit_prompt_chat_id')
-        if edit_prompt_message_id and edit_prompt_chat_id:
-            try:
-                await context.bot.delete_message(
-                    chat_id=edit_prompt_chat_id,
-                    message_id=edit_prompt_message_id
-                )
-            except Exception as e:
-                logger.debug(f"Could not delete edit prompt message: {e}")
     else:
         await update.message.reply_text(get_text("error_occurred", user_lang))
-        # Also delete the edit prompt message on error
-        edit_prompt_message_id = context.user_data.get('edit_prompt_message_id')
-        edit_prompt_chat_id = context.user_data.get('edit_prompt_chat_id')
-        if edit_prompt_message_id and edit_prompt_chat_id:
-            try:
-                await context.bot.delete_message(
-                    chat_id=edit_prompt_chat_id,
-                    message_id=edit_prompt_message_id
-                )
-            except Exception as e:
-                logger.debug(f"Could not delete edit prompt message: {e}")
 
-    # Clear edit mode and stored message IDs
-    context.user_data.pop('editing_reminder_id', None)
-    context.user_data.pop('edit_prompt_message_id', None)
-    context.user_data.pop('edit_prompt_chat_id', None)
+    # Clean up edit state
+    await _cleanup_edit_state(context)
+    return ConversationHandler.END
 
-    # Stop propagation to prevent reminder handler from creating a new reminder
-    raise ApplicationHandlerStop
+
+async def cancel_edit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cancel the edit operation."""
+    user_id = update.effective_user.id
+    user = get_user(user_id)
+    user_lang = user.get("language", "en") if user else "en"
+
+    await update.message.reply_text(get_text("edit_cancelled", user_lang))
+    await _cleanup_edit_state(context)
+    logger.info(f"User {user_id} cancelled edit operation")
+    return ConversationHandler.END
 
 
 def register_handlers(application):
@@ -813,12 +646,22 @@ def register_handlers(application):
     application.add_handler(CallbackQueryHandler(delete_confirm_callback, pattern="^delete_confirm_"))
     application.add_handler(CallbackQueryHandler(delete_cancel_callback, pattern="^delete_cancel_"))
     application.add_handler(CallbackQueryHandler(delete_callback, pattern="^delete_[0-9]+$"))
-    application.add_handler(CallbackQueryHandler(edit_callback, pattern="^edit_[0-9]+$"))
-    
-    # Handler for edit reply messages - must run BEFORE the reminder handler
-    # Using group=-1 to give it higher priority than the main reminder handler (group=0 by default)
-    # Handler raises ApplicationHandlerStop to prevent reminder creation when in edit mode
-    application.add_handler(
-        MessageHandler(filters.REPLY & filters.TEXT & ~filters.COMMAND, edit_message_handler),
-        group=-1
+
+    # ConversationHandler for edit flow
+    edit_conversation_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(edit_callback, pattern="^edit_[0-9]+$")
+        ],
+        states={
+            AWAITING_EDIT_INPUT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, edit_message_handler)
+            ]
+        },
+        fallbacks=[
+            CommandHandler("cancel", cancel_edit),
+        ],
+        per_chat=True,
+        per_user=True,
+        per_message=False,
     )
+    application.add_handler(edit_conversation_handler)

@@ -15,6 +15,51 @@ from network_monitor import record_network_timeout, record_network_success
 
 logger = logging.getLogger(__name__)
 
+# Exponential backoff delays in seconds: 30s, 1m, 2m, 5m, 10m
+BACKOFF_DELAYS = [30, 60, 120, 300, 600]
+
+
+def get_backoff_delay(retry_count: int) -> int:
+    """
+    Get the backoff delay for a given retry count.
+
+    Args:
+        retry_count: Current retry count (0-indexed)
+
+    Returns:
+        Delay in seconds before next retry
+    """
+    if retry_count >= len(BACKOFF_DELAYS):
+        return BACKOFF_DELAYS[-1]  # Use max delay for retries beyond the list
+    return BACKOFF_DELAYS[retry_count]
+
+
+def should_retry_now(last_retry_at: Optional[str], retry_count: int) -> bool:
+    """
+    Check if enough time has passed since last retry based on exponential backoff.
+
+    Args:
+        last_retry_at: Timestamp of last retry (string or None)
+        retry_count: Current retry count
+
+    Returns:
+        True if the message should be retried now
+    """
+    if last_retry_at is None:
+        # Never retried, should try now
+        return True
+
+    try:
+        last_retry = datetime.strptime(last_retry_at, '%Y-%m-%d %H:%M:%S')
+    except (ValueError, TypeError):
+        # Invalid timestamp, retry now
+        return True
+
+    required_delay = get_backoff_delay(retry_count)
+    elapsed = (datetime.now() - last_retry).total_seconds()
+
+    return elapsed >= required_delay
+
 
 def create_pending_message_table():
     """
@@ -180,8 +225,8 @@ async def process_pending_messages(bot: Bot):
 
 async def send_pending_message(bot: Bot, message: Dict[str, Any]):
     """
-    Attempt to send a pending message.
-    
+    Attempt to send a pending message with exponential backoff.
+
     Args:
         bot: Telegram bot instance
         message: Message dict from database
@@ -191,7 +236,14 @@ async def send_pending_message(bot: Bot, message: Dict[str, Any]):
     message_text = message['message_text']
     parse_mode = message.get('parse_mode')
     retry_count = message['retry_count']
-    
+    last_retry_at = message.get('last_retry_at')
+
+    # Check if enough time has passed since last retry (exponential backoff)
+    if not should_retry_now(last_retry_at, retry_count):
+        delay = get_backoff_delay(retry_count)
+        logger.debug(f"Message {message_id} not ready for retry (backoff {delay}s, retry #{retry_count})")
+        return  # Skip this message, will retry later
+
     try:
         # Attempt to send the message
         await bot.send_message(

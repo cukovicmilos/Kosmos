@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timedelta
 from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler, ConversationHandler, MessageHandler, filters
+from telegram.error import TelegramError
 import pytz
 
 from database import get_reminder_by_id, update_reminder_time, get_user, create_reminder
@@ -120,14 +121,15 @@ async def postpone_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Remove keyboard from original message (keep reminder visible but remove buttons)
         try:
             await query.edit_message_reply_markup(reply_markup=None)
-        except:
-            pass  # If message can't be edited, that's ok
+        except TelegramError as e:
+            # Expected - message may have been deleted or is too old to edit
+            logger.debug(f"Could not remove keyboard from message: {e}")
 
         # Format the new time for display
         reminder_text = reminder['message_text']
 
-        # Check if new time is today
-        now_date = datetime.now().date()
+        # Check if new time is today (using user's timezone)
+        now_date = now.date()  # 'now' is already in user's timezone from line 78
         new_time_date = new_time_naive.date()
 
         if now_date == new_time_date:
@@ -223,8 +225,9 @@ async def custom_time_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             # Format the new time for display
             reminder_text = reminder['message_text']
 
-            # Check if new time is today
-            now_date = datetime.now().date()
+            # Check if new time is today (using user's timezone)
+            tz = pytz.timezone(user_timezone)
+            now_date = datetime.now(tz).date()
             new_time_date = new_time.date()
 
             if now_date == new_time_date:

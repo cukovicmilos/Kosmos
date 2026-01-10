@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 
 from database import get_user, update_user_language, update_user_time_format, update_user_timezone
 from i18n import get_text
+from config import TIMEZONE_OPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -162,34 +163,13 @@ async def show_timezone_selection(query, user_lang):
     """
     message_text = get_text("select_timezone", user_lang)
 
-    # Common timezones
-    timezones = [
-        ("🇷🇸 Europe/Belgrade", "Europe/Belgrade"),
-        ("🇬🇧 Europe/London", "Europe/London"),
-        ("🇩🇪 Europe/Berlin", "Europe/Berlin"),
-        ("🇫🇷 Europe/Paris", "Europe/Paris"),
-        ("🇮🇹 Europe/Rome", "Europe/Rome"),
-        ("🇪🇸 Europe/Madrid", "Europe/Madrid"),
-        ("🇷🇺 Europe/Moscow", "Europe/Moscow"),
-        ("🇺🇸 America/New_York", "America/New_York"),
-        ("🇺🇸 America/Chicago", "America/Chicago"),
-        ("🇺🇸 America/Los_Angeles", "America/Los_Angeles"),
-        ("🇨🇦 America/Toronto", "America/Toronto"),
-        ("🇧🇷 America/Sao_Paulo", "America/Sao_Paulo"),
-        ("🇨🇳 Asia/Shanghai", "Asia/Shanghai"),
-        ("🇯🇵 Asia/Tokyo", "Asia/Tokyo"),
-        ("🇮🇳 Asia/Kolkata", "Asia/Kolkata"),
-        ("🇦🇪 Asia/Dubai", "Asia/Dubai"),
-        ("🇦🇺 Australia/Sydney", "Australia/Sydney"),
-    ]
-
-    # Create keyboard (2 per row)
+    # Create keyboard (2 per row) using TIMEZONE_OPTIONS from config
     keyboard = []
-    for i in range(0, len(timezones), 2):
+    for i in range(0, len(TIMEZONE_OPTIONS), 2):
         row = []
         for j in range(2):
-            if i + j < len(timezones):
-                label, tz = timezones[i + j]
+            if i + j < len(TIMEZONE_OPTIONS):
+                label, tz = TIMEZONE_OPTIONS[i + j]
                 row.append(InlineKeyboardButton(
                     label,
                     callback_data=f"set_timezone_{tz}"

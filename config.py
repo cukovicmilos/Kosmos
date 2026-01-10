@@ -31,6 +31,33 @@ LOG_FILE = LOG_DIR / "app.log"
 # Timezone configuration
 DEFAULT_TIMEZONE = os.getenv("DEFAULT_TIMEZONE", "Europe/Belgrade")
 
+# Available timezone options for user selection
+# Format: (display_name, timezone_id)
+TIMEZONE_OPTIONS = [
+    # Europe
+    ("🇷🇸 Europe/Belgrade", "Europe/Belgrade"),
+    ("🇬🇧 Europe/London", "Europe/London"),
+    ("🇩🇪 Europe/Berlin", "Europe/Berlin"),
+    ("🇫🇷 Europe/Paris", "Europe/Paris"),
+    ("🇮🇹 Europe/Rome", "Europe/Rome"),
+    ("🇪🇸 Europe/Madrid", "Europe/Madrid"),
+    ("🇷🇺 Europe/Moscow", "Europe/Moscow"),
+    # Americas
+    ("🇺🇸 America/New_York", "America/New_York"),
+    ("🇺🇸 America/Chicago", "America/Chicago"),
+    ("🇺🇸 America/Denver", "America/Denver"),
+    ("🇺🇸 America/Los_Angeles", "America/Los_Angeles"),
+    ("🇨🇦 America/Toronto", "America/Toronto"),
+    ("🇧🇷 America/Sao_Paulo", "America/Sao_Paulo"),
+    # Asia
+    ("🇨🇳 Asia/Shanghai", "Asia/Shanghai"),
+    ("🇯🇵 Asia/Tokyo", "Asia/Tokyo"),
+    ("🇮🇳 Asia/Kolkata", "Asia/Kolkata"),
+    ("🇦🇪 Asia/Dubai", "Asia/Dubai"),
+    # Oceania
+    ("🇦🇺 Australia/Sydney", "Australia/Sydney"),
+]
+
 # Supported languages
 SUPPORTED_LANGUAGES = ["en", "sr-lat"]
 DEFAULT_LANGUAGE = "en"
