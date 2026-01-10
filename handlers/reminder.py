@@ -11,7 +11,7 @@ from telegram.ext import ContextTypes, MessageHandler, filters
 from telegram.error import NetworkError, TimedOut
 
 from database import create_reminder, get_user
-from parsers.time_parser import parse_reminder, format_datetime
+from parsers.time_parser import parse_reminder, format_datetime, format_reminder_confirmation
 from i18n import get_text
 from message_queue import queue_message
 
@@ -94,27 +94,10 @@ async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_
         )
 
         if reminder_id:
-            # Success - prepare confirmation message
-            # Check if scheduled time is today (in user's timezone)
-            now_date = now.date()  # Already in user's timezone from earlier
-            scheduled_date = scheduled_time.date()
-
-            if now_date == scheduled_date:
-                # Today - show only time
-                if user_time_format == "12h":
-                    time_str = scheduled_time.strftime("%I:%M %p")
-                else:
-                    time_str = scheduled_time.strftime("%H:%M")
-                confirmation_msg = f"✓ {reminder_text} > {time_str}"
-            else:
-                # Another day - show day abbreviation, date and time
-                day_abbr = scheduled_time.strftime("%a")
-                date_str = scheduled_time.strftime("%d.%m.%Y.")
-                if user_time_format == "12h":
-                    time_str = scheduled_time.strftime("%I:%M %p")
-                else:
-                    time_str = scheduled_time.strftime("%H:%M")
-                confirmation_msg = f"✓ {reminder_text} > {day_abbr} {date_str} {time_str}"
+            # Success - prepare confirmation message using helper function
+            confirmation_msg = format_reminder_confirmation(
+                reminder_text, scheduled_time, user_time_format, now=now
+            )
 
             # Try to send confirmation immediately
             try:

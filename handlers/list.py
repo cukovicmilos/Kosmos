@@ -11,7 +11,7 @@ from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, Mes
 import pytz
 
 from database import get_user_reminders, delete_reminder, get_user, get_reminder_by_id, update_reminder
-from parsers.time_parser import format_datetime, parse_reminder
+from parsers.time_parser import format_datetime, parse_reminder, format_reminder_confirmation
 from i18n import get_text
 from telegram.helpers import escape_markdown
 from telegram import ForceReply
@@ -594,24 +594,12 @@ async def edit_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         final_text = new_text if new_text else reminder['message_text']
 
         if new_time:
-            # Format the time for display (using user's timezone)
+            # Use helper function for consistent confirmation formatting
             tz = pytz.timezone(user_timezone)
-            now_date = datetime.now(tz).date()
-            new_time_date = new_time.date()
-
-            if now_date == new_time_date:
-                if user_time_format == "12h":
-                    time_str = new_time.strftime("%I:%M %p")
-                else:
-                    time_str = new_time.strftime("%H:%M")
-                confirmation = f"✓ {final_text} > {time_str}"
-            else:
-                date_str = new_time.strftime("%d.%m.%Y.")
-                if user_time_format == "12h":
-                    time_str = new_time.strftime("%I:%M %p")
-                else:
-                    time_str = new_time.strftime("%H:%M")
-                confirmation = f"✓ {final_text} > {date_str} {time_str}"
+            now = datetime.now(tz).replace(tzinfo=None)
+            confirmation = format_reminder_confirmation(
+                final_text, new_time, user_time_format, now=now
+            )
         else:
             # Only text was updated
             confirmation = f"✓ {final_text}"

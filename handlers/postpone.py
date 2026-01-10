@@ -11,7 +11,7 @@ from telegram.error import TelegramError
 import pytz
 
 from database import get_reminder_by_id, update_reminder_time, get_user, create_reminder
-from parsers.time_parser import parse_reminder, format_datetime
+from parsers.time_parser import parse_reminder, format_datetime, format_reminder_confirmation
 from i18n import get_text
 
 logger = logging.getLogger(__name__)
@@ -128,25 +128,10 @@ async def postpone_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Format the new time for display
         reminder_text = reminder['message_text']
 
-        # Check if new time is today (using user's timezone)
-        now_date = now.date()  # 'now' is already in user's timezone from line 78
-        new_time_date = new_time_naive.date()
-
-        if now_date == new_time_date:
-            # Today - show only time
-            if user_time_format == "12h":
-                time_str = new_time_naive.strftime("%I:%M %p")
-            else:
-                time_str = new_time_naive.strftime("%H:%M")
-            postpone_msg = f"⏰ {reminder_text} > {time_str}"
-        else:
-            # Another day - show date and time
-            date_str = new_time_naive.strftime("%d.%m.%Y.")
-            if user_time_format == "12h":
-                time_str = new_time_naive.strftime("%I:%M %p")
-            else:
-                time_str = new_time_naive.strftime("%H:%M")
-            postpone_msg = f"⏰ {reminder_text} > {date_str} {time_str}"
+        # Format postpone confirmation using helper function
+        postpone_msg = format_reminder_confirmation(
+            reminder_text, new_time_naive, user_time_format, now=now, prefix="⏰"
+        )
 
         # Send confirmation as a new message (don't edit the original)
         await query.message.reply_text(postpone_msg)
@@ -222,29 +207,13 @@ async def custom_time_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             logger.info(f"Updated one-time reminder {reminder_id} to custom time {new_time}")
 
         if success:
-            # Format the new time for display
+            # Format the new time for display using helper function
             reminder_text = reminder['message_text']
-
-            # Check if new time is today (using user's timezone)
             tz = pytz.timezone(user_timezone)
-            now_date = datetime.now(tz).date()
-            new_time_date = new_time.date()
-
-            if now_date == new_time_date:
-                # Today - show only time
-                if user_time_format == "12h":
-                    time_str = new_time.strftime("%I:%M %p")
-                else:
-                    time_str = new_time.strftime("%H:%M")
-                postpone_msg = f"⏰ {reminder_text} > {time_str}"
-            else:
-                # Another day - show date and time
-                date_str = new_time.strftime("%d.%m.%Y.")
-                if user_time_format == "12h":
-                    time_str = new_time.strftime("%I:%M %p")
-                else:
-                    time_str = new_time.strftime("%H:%M")
-                postpone_msg = f"⏰ {reminder_text} > {date_str} {time_str}"
+            now = datetime.now(tz).replace(tzinfo=None)
+            postpone_msg = format_reminder_confirmation(
+                reminder_text, new_time, user_time_format, now=now, prefix="⏰"
+            )
 
             await update.message.reply_text(postpone_msg)
             logger.info(f"Reminder {reminder_id} postponed to custom time {new_time}")
