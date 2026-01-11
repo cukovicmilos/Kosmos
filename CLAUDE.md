@@ -35,4 +35,25 @@ You MUST read the overview resource to understand the complete workflow. The inf
 1. **Before any code change**: Read and understand `State_Machine.md` to comprehend the current state machines and component interactions
 2. **After code change**: Update `State_Machine.md` if the change affects any state machine, component interaction, or introduces new states/transitions
 
-- zapamti komade za ovaj bot servis
+## BOT SERVICE COMMANDS
+
+Bot se pokreće preko systemd servisa. **NIKAD ne pokretati ručno sa `python main.py`**.
+
+```bash
+# Pokreni bot
+sudo systemctl start kosmos-bot
+
+# Zaustavi bot
+sudo systemctl stop kosmos-bot
+
+# Restartuj bot
+sudo systemctl restart kosmos-bot
+
+# Proveri status
+sudo systemctl status kosmos-bot
+
+# Pregledaj logove
+tail -f /var/www/html/kosmos/log/bot.log
+```
+
+Servis je konfigurisan da se automatski pokreće pri boot-u i restartuje ako padne.
