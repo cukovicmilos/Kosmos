@@ -24,17 +24,17 @@ msgstr "You're all set! 🎉\n\nUse the buttons below for quick access, or just 
 
 # Commands help
 msgid "help_message"
-msgstr "📖 *Kosmos Help*\n\n*Creating reminders:*\nSend a message with text and time:\n• `Reminder text tomorrow 16:00`\n• `Reminder text mon 10:00`\n• `Reminder text 14:30`\n\n*Recurring reminders:* 🔁\nUse /recurring to create reminders that repeat automatically:\n• Daily - Every day at the same time\n• Every X days - Repeat every N days\n• Weekly - Specific days (Mon, Wed, Fri...)\n• Monthly - On a specific day of the month\n\n*Supported time formats:*\n• Days: tomorrow, dat (day after tomorrow), mon/tue/wed/thu/fri/sat/sun\n• Time: 21:00, 8, 7am, 2100, etc.\n\n*Commands:*\n/list - View all upcoming reminders\n/recurring - Create recurring reminder\n/settings - Change language, time format, timezone\n/help - Show this help message\n\n*Quick actions:*\nUse the 'List' and 'Recurring' buttons below for quick access."
+msgstr "📖 *Kosmos Help*\n\n*Creating reminders:*\nSend a message with text and time:\n• `Reminder text tomorrow 16:00`\n• `Reminder text mon 10:00`\n• `Reminder text 14:30`\n\n*Recurring reminders:* 🔁\nUse /recurring to create reminders that repeat automatically:\n• Daily - Every day at the same time\n• Every X days - Repeat every N days\n• Weekly - Specific days (Mon, Wed, Fri...)\n• Monthly - On a specific day of the month\n\n*Supported time formats:*\n• Days: tomorrow, dat (day after tomorrow), mon/tue/wed/thu/fri/sat/sun\n• Next week: next mon/tue/wed/thu/fri/sat/sun\n• Time: 21:00, 8, 7am, 2100, etc.\n\n*Commands:*\n/list - View all upcoming reminders\n/recurring - Create recurring reminder\n/settings - Change language, time format, timezone\n/help - Show this help message\n\n*Quick actions:*\nUse the 'List' and 'Recurring' buttons below for quick access."
 
 msgid "new_reminder_prompt"
-msgstr "📝 To create a reminder, send me a message in this format:\n\n`[Your reminder text] [day] [time]`\n\n*Examples:*\n• Take fishing rod to the lake tomorrow 16:00\n• Meeting mon 10:00\n• Coffee 14:30"
+msgstr "📝 To create a reminder, send me a message in this format:\n\n`[Your reminder text] [day] [time]`\n\n*Examples:*\n• Take fishing rod to the lake tomorrow 16:00\n• Meeting mon 10:00\n• Call next monday 9:00\n• Coffee 14:30"
 
 # Reminder creation
 msgid "reminder_created"
 msgstr "Recorded ✓"
 
 msgid "reminder_parse_error"
-msgstr "I couldn't understand the time format. Please try again:\n\n`[Message] [day] [time]`\n\n*Examples:*\n• Take fishing rod tomorrow 16:00\n• Meeting mon 10:00\n• Coffee 14:30"
+msgstr "I couldn't understand the time format. Please try again:\n\n`[Message] [day] [time]`\n\n*Examples:*\n• Take fishing rod tomorrow 16:00\n• Meeting mon 10:00\n• Meeting next thu 10:00\n• Coffee 14:30"
 
 # Reminder notifications
 msgid "reminder_notification"

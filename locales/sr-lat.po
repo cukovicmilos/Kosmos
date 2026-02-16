@@ -24,17 +24,17 @@ msgstr "Sve je spremno! 🎉\n\nKoristi dugmad ispod za brzi pristup, ili mi sam
 
 # Commands help
 msgid "help_message"
-msgstr "📖 *Kosmos Pomoć*\n\n*Kreiranje podsetnika:*\nPošalji poruku sa tekstom i vremenom:\n• `Tekst podsetnika sutra 16:00`\n• `Tekst podsetnika pon 10:00`\n• `Tekst podsetnika 14:30`\n\n*Ponavljajući podsetnoci:* 🔁\nKoristi /recurring da kreiraš podsetnike koji se automatski ponavljaju:\n• Svaki dan - Svakog dana u isto vreme\n• Svaki X dan - Ponavlja se svakih N dana\n• Nedeljno - Određeni dani (Pon, Sre, Pet...)\n• Mesečno - Određeni dan u mesecu\n\n*Podržani formati vremena:*\n• Dani: sutra, prekosutra, pon/uto/sre/cet/pet/sub/ned\n• Vreme: 21:00, 8, 7am, 2100, itd.\n\n*Komande:*\n/list - Prikaži sve podsetnike u budućnosti\n/recurring - Kreiraj ponavljajući podsetnik\n/settings - Promeni jezik, format vremena, vremensku zonu\n/help - Prikaži ovu pomoć\n\n*Brze akcije:*\nKoristi dugmad 'List' i 'Ponavljajući' ispod za brzi pristup."
+msgstr "📖 *Kosmos Pomoć*\n\n*Kreiranje podsetnika:*\nPošalji poruku sa tekstom i vremenom:\n• `Tekst podsetnika sutra 16:00`\n• `Tekst podsetnika pon 10:00`\n• `Tekst podsetnika 14:30`\n\n*Ponavljajući podsetnoci:* 🔁\nKoristi /recurring da kreiraš podsetnike koji se automatski ponavljaju:\n• Svaki dan - Svakog dana u isto vreme\n• Svaki X dan - Ponavlja se svakih N dana\n• Nedeljno - Određeni dani (Pon, Sre, Pet...)\n• Mesečno - Određeni dan u mesecu\n\n*Podržani formati vremena:*\n• Dani: sutra, prekosutra, pon/uto/sre/cet/pet/sub/ned\n• Sledeća nedelja: sl pon/uto/sre/cet/pet/sub/ned\n• Vreme: 21:00, 8, 7am, 2100, itd.\n\n*Komande:*\n/list - Prikaži sve podsetnike u budućnosti\n/recurring - Kreiraj ponavljajući podsetnik\n/settings - Promeni jezik, format vremena, vremensku zonu\n/help - Prikaži ovu pomoć\n\n*Brze akcije:*\nKoristi dugmad 'List' i 'Ponavljajući' ispod za brzi pristup."
 
 msgid "new_reminder_prompt"
-msgstr "📝 Da kreiraš podsetnik, pošalji mi poruku u ovom formatu:\n\n`[Tvoj tekst podsetnika] [dan] [vreme]`\n\n*Primeri:*\n• Ponesi pecaljku na jezero sutra 16:00\n• Sastanak pon 10:00\n• Kafa 14:30"
+msgstr "📝 Da kreiraš podsetnik, pošalji mi poruku u ovom formatu:\n\n`[Tvoj tekst podsetnika] [dan] [vreme]`\n\n*Primeri:*\n• Ponesi pecaljku na jezero sutra 16:00\n• Sastanak pon 10:00\n• Poziv sl pon 9:00\n• Kafa 14:30"
 
 # Reminder creation
 msgid "reminder_created"
 msgstr "Zabeleženo ✓"
 
 msgid "reminder_parse_error"
-msgstr "Nisam razumeo format vremena. Pokušaj ponovo:\n\n`[Poruka] [dan] [vreme]`\n\n*Primeri:*\n• Ponesi pecaljku sutra 16:00\n• Sastanak pon 10:00\n• Kafa 14:30"
+msgstr "Nisam razumeo format vremena. Pokušaj ponovo:\n\n`[Poruka] [dan] [vreme]`\n\n*Primeri:*\n• Ponesi pecaljku sutra 16:00\n• Sastanak pon 10:00\n• Sastanak sl cet 10:00\n• Kafa 14:30"
 
 # Reminder notifications
 msgid "reminder_notification"

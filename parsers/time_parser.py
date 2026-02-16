@@ -3,7 +3,7 @@ Time parser for Kosmos Telegram Bot.
 Parses natural language time expressions in Serbian and English.
 
 Supported formats:
-- Days: sutra/tomorrow, prekosutra/dat, pon-ned/mon-sun
+- Days: sutra/tomorrow, prekosutra/dat, pon-ned/mon-sun, next/sl + day (next week)
 - Dates: DD.MM.YYYY., DD.MM.YYYY, DD.MM., DD.MM, DD/MM/YYYY, DD/MM
 - Times: HH:MM, H, HAM/PM, HHMM military time
 
@@ -59,6 +59,12 @@ WEEKDAY_KEYWORDS = {
     'friday': 4,
     'saturday': 5,
     'sunday': 6,
+}
+
+# "Next week" keywords - prefix modifier for weekday keywords
+NEXT_KEYWORDS = {
+    'next',  # English
+    'sl',    # Serbian (sledeći)
 }
 
 
@@ -248,6 +254,7 @@ def parse_reminder(message: str, user_timezone: str = "Europe/Belgrade") -> Opti
     day_offset = 0  # Days to add
     target_weekday = None  # Target weekday if specified
     target_date = None  # Specific date if specified
+    is_next_week = False  # "next" prefix modifier
     reminder_text = None
 
     # Try parsing last word as time
@@ -268,7 +275,11 @@ def parse_reminder(message: str, user_timezone: str = "Europe/Belgrade") -> Opti
                 reminder_text = ' '.join(words[:-2])
             elif second_last_lower in WEEKDAY_KEYWORDS:
                 target_weekday = WEEKDAY_KEYWORDS[second_last_lower]
-                reminder_text = ' '.join(words[:-2])
+                if len(words) >= 3 and words[-3].lower() in NEXT_KEYWORDS:
+                    is_next_week = True
+                    reminder_text = ' '.join(words[:-3])
+                else:
+                    reminder_text = ' '.join(words[:-2])
             else:
                 # Try parsing as a date (e.g., 23.12.2025, 23.12., 23/12)
                 parsed_date = parse_date_string(second_last, now)
@@ -305,7 +316,11 @@ def parse_reminder(message: str, user_timezone: str = "Europe/Belgrade") -> Opti
                         reminder_text = ' '.join(words[:-2])
                     elif day_word_lower in WEEKDAY_KEYWORDS:
                         target_weekday = WEEKDAY_KEYWORDS[day_word_lower]
-                        reminder_text = ' '.join(words[:-2])
+                        if len(words) >= 3 and words[-3].lower() in NEXT_KEYWORDS:
+                            is_next_week = True
+                            reminder_text = ' '.join(words[:-3])
+                        else:
+                            reminder_text = ' '.join(words[:-2])
                     else:
                         # Try parsing as a date
                         parsed_date = parse_date_string(day_word, now)
@@ -330,6 +345,8 @@ def parse_reminder(message: str, user_timezone: str = "Europe/Belgrade") -> Opti
     elif target_weekday is not None:
         # Weekday specified - get next occurrence
         scheduled_dt = get_next_weekday(target_weekday, now)
+        if is_next_week:
+            scheduled_dt += timedelta(days=7)
         scheduled_dt = scheduled_dt.replace(hour=hour, minute=minute, second=0, microsecond=0)
     else:
         # Day offset specified or today
@@ -459,6 +476,11 @@ if __name__ == "__main__":
         "Event 31.12 18:00",
         "Party 01/01/2026 20:00",
         "Dinner 24/12 19:30",
+        # Next week tests
+        "Meeting next thu 14:00",
+        "Sastanak sl pon 10:00",
+        "Call next monday 9:00",
+        "Kafa next fri 16:00",
     ]
 
     print("Testing time parser:\n")

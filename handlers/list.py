@@ -564,6 +564,7 @@ async def edit_message_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     time_only_patterns = [
         r'^(\d{1,2}:\d{2})$',  # 15:00
         r'^(\d{1,2})\s*(am|pm)$',  # 3pm, 3 pm
+        r'^(next|sl)\s+(pon|uto|sre|cet|čet|pet|sub|ned|mon|tue|wed|thu|fri|sat|sun)\s+\d{1,2}:\d{2}$',  # next tue 15:00
         r'^(pon|uto|sre|cet|čet|pet|sub|ned|mon|tue|wed|thu|fri|sat|sun)\s+\d{1,2}:\d{2}$',  # tue 15:00
         r'^(sutra|prekosutra|tomorrow|dat)\s+\d{1,2}:\d{2}$',  # tomorrow 15:00
     ]
