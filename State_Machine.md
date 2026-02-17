@@ -106,7 +106,31 @@ stateDiagram-v2
 - Cancel command can be issued from any state
 - Confirmation state allows final yes/no decision
 
-## 4. Settings Configuration State Machine
+## 4. Quick Reminder State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> SELECTING_TEMPLATE: "⚡ Quick"/"⚡ Brzi" button
+    SELECTING_TEMPLATE --> ENTERING_TIME: Template selected (quick_select_{index})
+    ENTERING_TIME --> [*]: Valid time → reminder created
+    ENTERING_TIME --> ENTERING_TIME: Invalid time → re-prompt
+
+    SELECTING_TEMPLATE --> [*]: No history → show message
+    [*] --> [*]: /cancel command
+```
+
+**States:**
+- **SELECTING_TEMPLATE** (0): Inline keyboard with top 10 frequent reminder texts displayed, waiting for user selection
+- **ENTERING_TIME** (1): User selected a template, waiting for time input (e.g., "sub 20:00", "sutra 14:00")
+
+**Flow:**
+1. User clicks "⚡ Quick"/"⚡ Brzi" keyboard button
+2. Bot queries last 100 sent non-recurring reminders, groups by LOWER(text), shows top 10
+3. User clicks a template → bot asks "Kada?"
+4. User enters time → bot combines template text + time input, uses `parse_reminder()` to create reminder
+5. Bot confirms with `format_reminder_confirmation()`
+
+## 5. Settings Configuration State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -142,7 +166,7 @@ stateDiagram-v2
 - **SetLanguage/TimeFormat/Timezone**: Database update operations
 - **Error**: Database operation failure
 
-## 5. List/Delete/Edit Operations State Machine
+## 6. List/Delete/Edit Operations State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -203,7 +227,7 @@ Parse strategies:
 
 Fallback: User can cancel edit with /cancel command
 
-## 6. Reminder Execution State Machine (Scheduler)
+## 7. Reminder Execution State Machine (Scheduler)
 
 ```mermaid
 stateDiagram-v2
@@ -253,7 +277,7 @@ Reminders are stored as naive datetime in the user's local timezone. When checki
 
 This ensures reminders fire at the correct time regardless of server timezone.
 
-## 7. Postpone Reminder State Machine
+## 8. Postpone Reminder State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -277,7 +301,7 @@ stateDiagram-v2
 - **CustomTimePrompt**: Show input field for custom postpone time
 - **ParseCustomTime**: Parse user's custom time input
 
-## 8. Message Queue State Machine
+## 9. Message Queue State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -319,7 +343,7 @@ Messages are retried with increasing delays to prevent API hammering:
 
 After 5 failed retries, messages are cleaned up during daily cleanup.
 
-## 9. Network Monitoring State Machine
+## 10. Network Monitoring State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -347,7 +371,7 @@ stateDiagram-v2
 - **GenerateReport**: User requests network statistics
 - **DisplayStats**: Show success/failure rates and recent issues
 
-## 10. Bot Statistics State Machine
+## 11. Bot Statistics State Machine
 
 ```mermaid
 stateDiagram-v2

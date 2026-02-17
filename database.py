@@ -541,6 +541,43 @@ def get_reminder_by_id(reminder_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 
+# ==================== QUICK REMINDER OPERATIONS ====================
+
+def get_frequent_reminder_texts(user_id: int, limit: int = 10) -> List[str]:
+    """
+    Get the most frequent reminder texts from a user's last 100 sent reminders.
+    Excludes recurring reminder copies to avoid skewing results.
+
+    Args:
+        user_id: Telegram user ID
+        limit: Maximum number of texts to return
+
+    Returns:
+        List of most frequent reminder texts (deduplicated by LOWER())
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT message_text, COUNT(*) as cnt
+                FROM (
+                    SELECT message_text FROM reminders
+                    WHERE user_id = ? AND status = 'sent' AND is_recurring = 0
+                    ORDER BY created_at DESC
+                    LIMIT 100
+                )
+                GROUP BY LOWER(message_text)
+                ORDER BY cnt DESC
+                LIMIT ?
+            """, (user_id, limit))
+
+            rows = cursor.fetchall()
+            return [row['message_text'] for row in rows]
+    except Exception as e:
+        logger.error(f"Error getting frequent reminders for user {user_id}: {e}")
+        return []
+
+
 # ==================== STATISTICS OPERATIONS ====================
 
 def get_monthly_active_users() -> int:

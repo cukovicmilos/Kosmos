@@ -167,3 +167,13 @@ msgstr "Reminder not found or already deleted."
 
 msgid "reminder_in_past"
 msgstr "Cannot create a reminder in the past. Please choose a future date and time."
+
+# Quick reminders
+msgid "quick_title"
+msgstr "⚡ *Your most frequent reminders:*"
+
+msgid "quick_when"
+msgstr "⏰ *{text}*\n\nWhen? Enter time (e.g. `sat 20:00`, `tomorrow 14:00`, `18:30`)"
+
+msgid "quick_no_history"
+msgstr "You don't have enough reminder history for Quick access."

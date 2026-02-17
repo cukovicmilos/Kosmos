@@ -167,3 +167,13 @@ msgstr "Podsetnik nije pronađen ili je već obrisan."
 
 msgid "reminder_in_past"
 msgstr "Ne mogu da kreiram podsetnik u prošlosti. Izaberi datum i vreme u budućnosti."
+
+# Quick reminders
+msgid "quick_title"
+msgstr "⚡ *Tvoji najčešći podsetnici:*"
+
+msgid "quick_when"
+msgstr "⏰ *{text}*\n\nKada? Upiši vreme (npr. `sub 20:00`, `sutra 14:00`, `18:30`)"
+
+msgid "quick_no_history"
+msgstr "Nemaš dovoljno podsetnika u istoriji za Quick pristup."
