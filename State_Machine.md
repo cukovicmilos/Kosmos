@@ -72,6 +72,7 @@ stateDiagram-v2
     RECURRENCE_TYPE --> INTERVAL_DAYS: Interval selected
     RECURRENCE_TYPE --> WEEKLY_DAYS: Weekly selected
     RECURRENCE_TYPE --> MONTHLY_DAY: Monthly selected
+    RECURRENCE_TYPE --> [*]: Cancel button
 
     INTERVAL_DAYS --> TIME_INPUT: Valid interval (1-365)
     MONTHLY_DAY --> TIME_INPUT: Valid day (1-31)
@@ -79,8 +80,14 @@ stateDiagram-v2
     WEEKLY_DAYS --> SelectDays: Initial display
     SelectDays --> SelectDays: Day toggle
     SelectDays --> TIME_INPUT: Done clicked + days selected
+    SelectDays --> [*]: Cancel button
 
-    TIME_INPUT --> CONFIRM: Valid time parsed
+    TIME_INPUT --> DURATION_CHOICE: Valid time parsed
+    DURATION_CHOICE --> CONFIRM: Forever or preset days selected
+    DURATION_CHOICE --> DURATION_INPUT: Custom selected
+    DURATION_CHOICE --> [*]: Cancel button
+    DURATION_INPUT --> CONFIRM: Valid days (1-365)
+
     CONFIRM --> [*]: Yes - create reminder
     CONFIRM --> [*]: No - cancel
 
@@ -88,22 +95,25 @@ stateDiagram-v2
     INTERVAL_DAYS --> INTERVAL_DAYS: Invalid interval
     MONTHLY_DAY --> MONTHLY_DAY: Invalid day
     TIME_INPUT --> TIME_INPUT: Invalid time
+    DURATION_INPUT --> DURATION_INPUT: Invalid number
     SelectDays --> SelectDays: Done with no days
-    WEEKLY_DAYS --> [*]: Cancel command
 ```
 
 **States:**
 - **MESSAGE**: Waiting for reminder text input
-- **RECURRENCE_TYPE**: Selecting recurrence pattern (daily/interval/weekly/monthly)
+- **RECURRENCE_TYPE**: Selecting recurrence pattern (daily/interval/weekly/monthly) + cancel button
 - **INTERVAL_DAYS**: Input number of days for interval recurrence
-- **WEEKLY_DAYS**: Select which days of week for recurrence
+- **WEEKLY_DAYS**: Select which days of week for recurrence + cancel button
 - **MONTHLY_DAY**: Input day of month for monthly recurrence
 - **TIME_INPUT**: Input time for the recurring reminder
+- **DURATION_CHOICE**: Select duration (♾️ Forever / 7 / 14 / 30 days / custom) + cancel button
+- **DURATION_INPUT**: Input custom number of days (1-365)
 - **CONFIRM**: Show summary and confirm creation
 
 **Transitions:**
 - Each input state loops back on invalid input
-- Cancel command can be issued from any state
+- Cancel command (/cancel) can be issued from any text input state
+- Cancel button available on inline keyboard states (RECURRENCE_TYPE, WEEKLY_DAYS, DURATION_CHOICE)
 - Confirmation state allows final yes/no decision
 
 ## 4. Quick Reminder State Machine
@@ -245,7 +255,9 @@ stateDiagram-v2
     CheckRecurring --> MarkSent: One-time reminder
 
     RescheduleRecurring --> CalculateNext: Use recurrence rules
-    CalculateNext --> UpdateTime: Next occurrence calculated
+    CalculateNext --> CheckEndDate: Next occurrence calculated
+    CheckEndDate --> UpdateTime: No end date or within range
+    CheckEndDate --> MarkSent: End date exceeded
     UpdateTime --> [*]: Reminder rescheduled
 
     MarkSent --> [*]: Status updated to 'sent'
@@ -259,8 +271,9 @@ stateDiagram-v2
 - **CheckRecurring**: Determine if reminder is recurring or one-time
 - **RescheduleRecurring**: Handle recurring reminder rescheduling
 - **CalculateNext**: Compute next occurrence based on recurrence pattern
+- **CheckEndDate**: Check if next occurrence exceeds recurrence_end_date
 - **UpdateTime**: Update reminder's scheduled time in database
-- **MarkSent**: Mark one-time reminder as completed
+- **MarkSent**: Mark one-time reminder as completed (or recurring that reached end date)
 
 **Recurrence Types:**
 - **Daily**: Add 1 day to current time
@@ -300,6 +313,24 @@ stateDiagram-v2
 - **UpdateTime**: Update reminder's scheduled time in database
 - **CustomTimePrompt**: Show input field for custom postpone time
 - **ParseCustomTime**: Parse user's custom time input
+
+### 8.1 Stop Recurring from Notification
+
+```mermaid
+stateDiagram-v2
+    [*] --> StopClicked: "🗑️ Obriši ponavljanje" button
+    StopClicked --> ShowConfirmation: Verify ownership
+    ShowConfirmation --> DeleteReminder: "🗑️ Obriši zauvek"
+    ShowConfirmation --> RestoreButtons: "❌ Otkaži"
+    DeleteReminder --> [*]: Reminder cancelled
+    RestoreButtons --> [*]: Original notification restored
+```
+
+**States:**
+- **StopClicked**: User clicks delete recurring button on fired notification
+- **ShowConfirmation**: Show confirmation dialog with reminder text
+- **DeleteReminder**: Mark reminder as cancelled in database
+- **RestoreButtons**: Restore original notification with postpone + delete buttons
 
 ## 9. Message Queue State Machine
 

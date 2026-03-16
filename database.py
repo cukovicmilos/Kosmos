@@ -51,7 +51,8 @@ def migrate_recurring_columns(cursor):
         'recurrence_type': 'TEXT',
         'recurrence_interval': 'INTEGER',
         'recurrence_days': 'TEXT',
-        'recurrence_day_of_month': 'INTEGER'
+        'recurrence_day_of_month': 'INTEGER',
+        'recurrence_end_date': 'TIMESTAMP'
     }
 
     # Add missing columns
@@ -104,6 +105,7 @@ def init_database():
                 recurrence_interval INTEGER,
                 recurrence_days TEXT,
                 recurrence_day_of_month INTEGER,
+                recurrence_end_date TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(telegram_id) ON DELETE CASCADE
             )
         """)
@@ -270,7 +272,8 @@ def create_reminder(
     recurrence_type: Optional[str] = None,
     recurrence_interval: Optional[int] = None,
     recurrence_days: Optional[str] = None,
-    recurrence_day_of_month: Optional[int] = None
+    recurrence_day_of_month: Optional[int] = None,
+    recurrence_end_date: Optional[datetime] = None
 ) -> Optional[int]:
     """
     Create a new reminder (one-time or recurring).
@@ -284,6 +287,7 @@ def create_reminder(
         recurrence_interval: For 'interval' type - number of days between occurrences
         recurrence_days: For 'weekly' type - JSON array of days (e.g., '["monday", "wednesday"]')
         recurrence_day_of_month: For 'monthly' type - day of month (1-31)
+        recurrence_end_date: Optional end date for recurring reminders (None = forever)
 
     Returns:
         Reminder ID if created successfully, None otherwise
@@ -295,13 +299,13 @@ def create_reminder(
                 INSERT INTO reminders (
                     user_id, message_text, scheduled_time, status,
                     is_recurring, recurrence_type, recurrence_interval,
-                    recurrence_days, recurrence_day_of_month
+                    recurrence_days, recurrence_day_of_month, recurrence_end_date
                 )
-                VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
             """, (
                 user_id, message_text, scheduled_time,
                 1 if is_recurring else 0, recurrence_type, recurrence_interval,
-                recurrence_days, recurrence_day_of_month
+                recurrence_days, recurrence_day_of_month, recurrence_end_date
             ))
 
             reminder_id = cursor.lastrowid

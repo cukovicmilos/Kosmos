@@ -170,8 +170,14 @@ async def send_reminder(bot: Bot, reminder: dict):
     # In a future enhancement, we could join with users table to get language preference
     # But the database query already includes timezone from the JOIN
 
-    # Format reminder notification message
-    notification_text = f"🔔 {message_text}"
+    # Check if recurring (used for icon and delete button)
+    is_recurring = reminder.get('is_recurring', 0)
+
+    # Format reminder notification message (🔁 for recurring, 🔔 for one-time)
+    if is_recurring:
+        notification_text = f"🔁 {message_text}"
+    else:
+        notification_text = f"🔔 {message_text}"
 
     # Create inline keyboard with postpone options
     keyboard = [
@@ -186,6 +192,13 @@ async def send_reminder(bot: Bot, reminder: dict):
             InlineKeyboardButton("Drugo vreme", callback_data=f"postpone_{reminder_id}_custom"),
         ],
     ]
+
+    # Add delete button for recurring reminders
+    if is_recurring:
+        keyboard.append([
+            InlineKeyboardButton("🗑️ Obriši ponavljanje", callback_data=f"stop_recurring_{reminder_id}")
+        ])
+
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     try:
@@ -197,14 +210,32 @@ async def send_reminder(bot: Bot, reminder: dict):
             reply_markup=reply_markup
         )
 
-        # Check if this is a recurring reminder
-        is_recurring = reminder.get('is_recurring', 0)
-
         if is_recurring:
             # Calculate next occurrence and reschedule
             next_time = calculate_next_occurrence(reminder)
-            update_reminder_time(reminder_id, next_time)
-            logger.info(f"Recurring reminder {reminder_id} rescheduled to {next_time}")
+
+            # Check if recurring period has expired (end_date set)
+            end_date_str = reminder.get('recurrence_end_date')
+            if end_date_str:
+                # Parse end_date (stored as string in SQLite)
+                try:
+                    if '+' in end_date_str:
+                        end_date_str = end_date_str.split('+')[0]
+                    if '.' in end_date_str:
+                        end_date_str = end_date_str.split('.')[0]
+                    end_date = datetime.strptime(end_date_str, '%Y-%m-%d %H:%M:%S')
+                except (ValueError, AttributeError):
+                    end_date = None
+
+                if end_date and next_time > end_date:
+                    update_reminder_status(reminder_id, 'sent')
+                    logger.info(f"Recurring reminder {reminder_id} completed - end date {end_date} reached")
+                else:
+                    update_reminder_time(reminder_id, next_time)
+                    logger.info(f"Recurring reminder {reminder_id} rescheduled to {next_time}")
+            else:
+                update_reminder_time(reminder_id, next_time)
+                logger.info(f"Recurring reminder {reminder_id} rescheduled to {next_time}")
         else:
             # Mark one-time reminder as sent
             update_reminder_status(reminder_id, 'sent')

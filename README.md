@@ -124,7 +124,11 @@ Use `/recurring` command to create reminders that repeat automatically:
    Example: Pay rent on the 1st of each month at 12:00
    ```
 
-Recurring reminders are shown with a 🔁 icon in your list.
+Recurring reminders are shown with a 🔁 icon in your list and notifications.
+
+**Duration:** When creating a recurring reminder, you can choose how long it should repeat (7, 14, 30 days, custom, or forever). The reminder automatically stops after the chosen period.
+
+**Deleting from Notification:** When a recurring reminder fires, you can delete it directly from the notification using the "🗑️ Obriši ponavljanje" button.
 
 **Postponing Recurring Reminders:**
 When you postpone a recurring reminder, a new one-time reminder is created while the original continues on its schedule.

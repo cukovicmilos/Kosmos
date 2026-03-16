@@ -57,3 +57,12 @@ tail -f /var/www/html/kosmos/log/bot.log
 ```
 
 Servis je konfigurisan da se automatski pokreće pri boot-u i restartuje ako padne.
+
+## COMMIT HOOK: PROVERA HELP I README
+
+**Pri svakom commitu** proveri da li izmene utiču na business logiku ili dodaju nove opcije/komande. Ako da:
+
+1. **`handlers/help.py`** — ažuriraj help tekst ako su dodate/izmenjene komande, opcije ili ponašanje vidljivo korisniku
+2. **`README.md`** — ažuriraj dokumentaciju ako su izmene relevantne za krajnjeg korisnika (nove funkcionalnosti, promenjeno ponašanje, nove komande)
+
+Ovo se odnosi na izmene kao što su: novi handleri, nove komande, promenjena sintaksa komandi, nova podešavanja, izmene u flow-u koji korisnik vidi. Interno refaktorisanje ili bug fix koji ne menja korisničko iskustvo ne zahteva ažuriranje.

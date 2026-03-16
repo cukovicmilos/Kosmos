@@ -193,18 +193,24 @@ def build_reminder_list_message(
             message_text += f"\n{index}. {safe_reminder_text}\n"
             message_text += f"   {scheduled_time_str}\n"
 
-    # Create inline keyboard with Delete and Edit buttons
+    # Create compact inline keyboard with Delete and Edit buttons
+    # Pack pairs [🗑️1] [✏️1] [🗑️2] [✏️2] per row (2 reminders per row = 4 buttons)
     keyboard = []
+    row = []
     for index, reminder in enumerate(reminders, 1):
-        delete_button = InlineKeyboardButton(
-            f"🗑️ Obriši #{index}" if user_lang == "sr-lat" else f"🗑️ Delete #{index}",
+        row.append(InlineKeyboardButton(
+            f"🗑️{index}",
             callback_data=f"delete_{reminder['id']}"
-        )
-        edit_button = InlineKeyboardButton(
-            f"✏️ Izmeni #{index}" if user_lang == "sr-lat" else f"✏️ Edit #{index}",
+        ))
+        row.append(InlineKeyboardButton(
+            f"✏️{index}",
             callback_data=f"edit_{reminder['id']}"
-        )
-        keyboard.append([delete_button, edit_button])
+        ))
+        if len(row) >= 4:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
