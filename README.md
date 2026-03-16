@@ -1,62 +1,34 @@
 # Kosmos - Telegram Reminder Bot
 
-**Kosmos** is a Telegram bot designed to help you remember important tasks by sending you reminders at specified times.
+**Kosmos** is a Telegram bot that helps you remember important tasks by sending reminders at specified times. Supports natural language, recurring reminders, multiple languages, and timezones.
 
 ## Features
 
 - Create reminders with natural language time expressions
-- **🔁 Recurring reminders** - Daily, every X days, weekly (specific days), or monthly
+- **🔁 Recurring reminders** - Daily, every X days, weekly (specific days), or monthly with optional duration
 - Multiple language support (English, Serbian)
 - Postpone reminders with quick actions (15m, 30m, 1h, 3h, 1d) or custom time
 - List and manage all your upcoming reminders
-- Persistent keyboard buttons for quick access (List, Recurring)
-- Smart reminder confirmations showing scheduled time
+- Persistent keyboard buttons for quick access (List, Recurring, Quick)
 - Timezone support with accurate local time handling
 - Customizable time format (12h/24h)
 
-## Quick Start
+## Getting Started
 
-### 1. Create a Telegram Bot
+### Option 1: Use Kosmos Directly
 
-1. Open Telegram and search for **@BotFather**
-2. Send `/newbot` command
-3. Follow the instructions to set up your bot
-4. Copy the **BOT_TOKEN** provided by BotFather
+The fastest way - no setup required:
 
-### 2. Installation
+1. Open Telegram and search for **@kosmos_reminder_bot** or click [this link](https://t.me/kosmos_reminder_bot)
+2. Press **Start**
+3. Select your timezone
+4. Start sending reminders! Just type something like: `Meeting tomorrow 10:00`
 
-```bash
-# Clone the repository
-git clone git@github.com:cukovicmilos/Kosmos.git
-cd Kosmos/kosmos
+### Option 2: Self-Hosted
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Linux/Mac
-# or
-venv\Scripts\activate  # On Windows
+Want to run your own instance? See the [Self-Hosted Installation](#self-hosted-installation) section below.
 
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 3. Configuration
-
-```bash
-# Copy the example environment file
-cp .env.example .env
-
-# Edit .env and add your BOT_TOKEN
-nano .env  # or use your preferred editor
-```
-
-### 4. Run the Bot
-
-```bash
-python main.py
-```
-
-## Usage Examples
+## Usage
 
 ### Creating a Reminder
 
@@ -71,14 +43,15 @@ Coffee 14:30
 You'll receive a confirmation showing when the reminder is scheduled:
 ```
 ✓ Coffee > 14:30
-✓ Meeting > 15.11.2025. 10:00
+✓ Meeting > Mon 15.11.2025. 10:00
 ```
 
 ### Quick Access Buttons
 
 After running `/start`, you'll see persistent buttons at the bottom of your chat:
-- **📋 List** - Quickly view all your reminders
-- **🔁 Recurring** - Create a new recurring reminder
+- **📋 List** - View all your reminders
+- **🔁 Recurring** - Create a recurring reminder
+- **⚡ Quick** - Create a reminder from your most used texts
 
 ### Postponing Reminders
 
@@ -86,52 +59,29 @@ When a reminder arrives, you can postpone it with:
 - Quick actions: 15 min, 30 min, 1h, 3h, 1 day
 - Custom time: Choose "Drugo vreme" / "Custom time" and enter specific time (e.g., `19:00` or `tue 14:00`)
 
-After postponing, you'll see:
-```
-⏰ Coffee > 15:30  (if today)
-⏰ Meeting > 16.11.2025. 10:00  (if another day)
-```
-
 ### Commands
 
 - `/start` - Initialize the bot and show keyboard buttons
 - `/list` - View all upcoming reminders
 - `/recurring` - Create a recurring reminder (daily, weekly, monthly, etc.)
+- `/quick` - Create a reminder from your most used texts
 - `/settings` - Configure language, time format, and timezone
 - `/help` - Get help and usage examples
 
-### Creating Recurring Reminders
+### Recurring Reminders
 
 Use `/recurring` command to create reminders that repeat automatically:
 
 1. **Daily** - Every day at the same time
-   ```
-   Example: Daily standup meeting at 10:00
-   ```
-
 2. **Every X Days** - Repeat every N days
-   ```
-   Example: Water plants every 3 days at 09:00
-   ```
-
 3. **Weekly (Specific Days)** - Repeat on selected weekdays
-   ```
-   Example: Team meeting every Monday, Wednesday, Friday at 14:00
-   ```
-
 4. **Monthly** - Repeat on specific day of the month
-   ```
-   Example: Pay rent on the 1st of each month at 12:00
-   ```
 
-Recurring reminders are shown with a 🔁 icon in your list and notifications.
+**Duration:** Choose how long the reminder should repeat (7, 14, 30 days, custom, or forever). It automatically stops after the chosen period.
 
-**Duration:** When creating a recurring reminder, you can choose how long it should repeat (7, 14, 30 days, custom, or forever). The reminder automatically stops after the chosen period.
+**Deleting from Notification:** When a recurring reminder fires, you can delete it directly from the notification using the delete button.
 
-**Deleting from Notification:** When a recurring reminder fires, you can delete it directly from the notification using the "🗑️ Obriši ponavljanje" button.
-
-**Postponing Recurring Reminders:**
-When you postpone a recurring reminder, a new one-time reminder is created while the original continues on its schedule.
+**Postponing:** When you postpone a recurring reminder, a new one-time reminder is created while the original continues on its schedule.
 
 ## Supported Time Formats
 
@@ -139,6 +89,7 @@ When you postpone a recurring reminder, a new one-time reminder is created while
 - `tomorrow` / `sutra`
 - `dat` / `prekosutra` (day after tomorrow)
 - Day of week: `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`
+- Next week: `sl pon`, `sl uto`, `next mon`, `next tue`
 
 ### Time
 - `21:00` - hours and minutes
@@ -146,24 +97,65 @@ When you postpone a recurring reminder, a new one-time reminder is created while
 - `7am` / `7AM` / `7 AM` - AM/PM format
 - `2100` - military time
 
-## Project Structure
+## Self-Hosted Installation
 
-See [plan.md](../plan.md) for detailed project documentation and implementation plan.
+### 1. Create a Telegram Bot
 
-## Development Status
+1. Open Telegram and search for **@BotFather**
+2. Send `/newbot` command
+3. Follow the instructions to set up your bot
+4. Copy the **BOT_TOKEN** provided by BotFather
 
-✅ **Completed** - Version 1.1
+### 2. Clone and Install
 
-All major features implemented:
-- ✅ Bot initialization with timezone selection
-- ✅ Natural language time parsing (SR/EN)
-- ✅ Scheduler and reminder delivery with accurate timezone handling
-- ✅ **Recurring reminders** (daily, interval, weekly, monthly)
-- ✅ Postpone functionality (quick actions + custom time)
-- ✅ List and delete reminders (with sequential numbering)
-- ✅ Settings configuration (language, time format, timezone)
-- ✅ Persistent keyboard buttons for quick access
-- ✅ Smart reminder confirmations with scheduled time display
+```bash
+git clone git@github.com:cukovicmilos/Kosmos.git
+cd Kosmos
+
+python3 -m venv venv
+source venv/bin/activate
+
+pip install -r requirements.txt
+```
+
+### 3. Configure
+
+```bash
+cp .env.example .env
+nano .env  # Add your BOT_TOKEN
+```
+
+### 4. Run
+
+**Quick start:**
+```bash
+python main.py
+```
+
+**Production (systemd service):**
+
+Create `/etc/systemd/system/kosmos-bot.service`:
+```ini
+[Unit]
+Description=Kosmos Telegram Bot
+After=network-online.target
+
+[Service]
+User=your-user
+WorkingDirectory=/path/to/Kosmos
+ExecStart=/path/to/Kosmos/venv/bin/python /path/to/Kosmos/main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then:
+```bash
+sudo systemctl enable kosmos-bot
+sudo systemctl start kosmos-bot
+```
 
 ## Troubleshooting
 
@@ -174,8 +166,7 @@ All major features implemented:
 
 ### Reminders not sending
 - Check that scheduler is running (you'll see "Reminder scheduler started" in logs)
-- Verify database has pending reminders: `sqlite3 kosmos.db "SELECT * FROM reminders WHERE status='pending';"`
-- Check logs in `log/app.log` for errors
+- Check logs in `log/bot.log` for errors
 
 ### Time parsing issues
 - Time must be at the end of the message
@@ -185,16 +176,6 @@ All major features implemented:
 ### Keyboard buttons not showing
 - Send `/start` command to initialize persistent keyboard
 - Restart Telegram app if buttons don't appear
-- Make sure you have the latest version of Telegram
-
-### Postpone custom time not working
-- Make sure to enter time in correct format: `19:00` or `tue 14:00`
-- Time must be valid (0-23 hours, 0-59 minutes)
-- If entering a day, use supported day names (mon, tue, tomorrow, etc.)
-
-### Database issues
-- Delete `kosmos.db` and restart bot to recreate database
-- Check file permissions on database file
 
 ## License
 
@@ -202,4 +183,4 @@ MIT License
 
 ## Author
 
-Milos Cukovic (@cukovicmilos)
+Milos Cukovic ([@cukovicmilos](https://github.com/cukovicmilos))
