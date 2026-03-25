@@ -79,6 +79,7 @@ def parse_date_string(date_str: str, current_time: datetime) -> Optional[datetim
     - DD.MM (day and month, assumes current/next year)
     - DD/MM/YYYY (slash format)
     - DD/MM (slash format, assumes current/next year)
+    - DD.MM.YYYY.HH:MM (date and time combined without space)
 
     Args:
         date_str: Date string to parse
@@ -87,7 +88,20 @@ def parse_date_string(date_str: str, current_time: datetime) -> Optional[datetim
     Returns:
         Datetime object or None if parsing fails
     """
-    date_str = date_str.strip().rstrip('.')  # Remove trailing dot if present
+    date_str = date_str.strip().rstrip('.')
+
+    # Format: DD.MM.YYYY.HH:MM or DD.MM.YYYY.HH:MM (date and time combined)
+    match = re.match(r'^(\d{1,2})\.(\d{1,2})\.(\d{4})\.(\d{1,2}):(\d{2})$', date_str)
+    if match:
+        day = int(match.group(1))
+        month = int(match.group(2))
+        year = int(match.group(3))
+        hour = int(match.group(4))
+        minute = int(match.group(5))
+        try:
+            return current_time.replace(year=year, month=month, day=day, hour=hour, minute=minute, second=0, microsecond=0)
+        except ValueError:
+            return None
 
     # Format: DD.MM.YYYY or DD/MM/YYYY
     match = re.match(r'^(\d{1,2})[./](\d{1,2})[./](\d{4})$', date_str)
@@ -292,44 +306,54 @@ def parse_reminder(message: str, user_timezone: str = "Europe/Belgrade") -> Opti
         else:
             reminder_text = ' '.join(words[:-1])
     else:
-        # Try last 2 words as "day time" or "time am/pm"
-        if len(words) >= 2:
-            last_two = ' '.join(words[-2:]).lower()
+        # Try parsing last word as combined date+time (DD.MM.YYYY.HH:MM)
+        last_word_original = words[-1]
+        # Check if it looks like combined date+time format (contains date pattern followed by time)
+        if re.match(r'^\d{1,2}\.\d{1,2}\.\d{4}\.\d{1,2}:\d{2}$', last_word_original):
+            parsed_combined = parse_date_string(last_word_original, now)
+            if parsed_combined:
+                target_date = parsed_combined
+                time_part = (parsed_combined.hour, parsed_combined.minute)
+                reminder_text = ' '.join(words[:-1])
+        else:
+            # Try last 2 words as "day time" or "time am/pm"
+            if len(words) >= 2:
+                last_two = ' '.join(words[-2:]).lower()
 
-            # Try parsing as "H AM" or "H PM"
-            parsed_time = parse_time_string(last_two)
-            if parsed_time:
-                time_part = parsed_time
-                reminder_text = ' '.join(words[:-2])
-            else:
-                # Try as "day time" or "date time"
-                day_word = words[-2]  # Keep original case for date parsing
-                day_word_lower = day_word.lower()
-                time_word = words[-1].lower()
-
-                parsed_time = parse_time_string(time_word)
+                # Try parsing as "H AM" or "H PM"
+                parsed_time = parse_time_string(last_two)
                 if parsed_time:
                     time_part = parsed_time
+                    reminder_text = ' '.join(words[:-2])
+                else:
+                    # Try as "day time" or "date time"
+                    day_word = words[-2]  # Keep original case for date parsing
+                    day_word_lower = day_word.lower()
+                    time_word = words[-1].lower()
 
-                    if day_word_lower in DAY_KEYWORDS:
-                        day_offset = DAY_KEYWORDS[day_word_lower]
-                        reminder_text = ' '.join(words[:-2])
-                    elif day_word_lower in WEEKDAY_KEYWORDS:
-                        target_weekday = WEEKDAY_KEYWORDS[day_word_lower]
-                        if len(words) >= 3 and words[-3].lower() in NEXT_KEYWORDS:
-                            is_next_week = True
-                            reminder_text = ' '.join(words[:-3])
-                        else:
+                    parsed_time = parse_time_string(time_word)
+                    if parsed_time:
+                        time_part = parsed_time
+
+                        if day_word_lower in DAY_KEYWORDS:
+                            day_offset = DAY_KEYWORDS[day_word_lower]
                             reminder_text = ' '.join(words[:-2])
-                    else:
-                        # Try parsing as a date
-                        parsed_date = parse_date_string(day_word, now)
-                        if parsed_date:
-                            target_date = parsed_date
-                            reminder_text = ' '.join(words[:-2])
+                        elif day_word_lower in WEEKDAY_KEYWORDS:
+                            target_weekday = WEEKDAY_KEYWORDS[day_word_lower]
+                            if len(words) >= 3 and words[-3].lower() in NEXT_KEYWORDS:
+                                is_next_week = True
+                                reminder_text = ' '.join(words[:-3])
+                            else:
+                                reminder_text = ' '.join(words[:-2])
                         else:
-                            # Not a recognized day or date, include it in reminder text
-                            reminder_text = ' '.join(words[:-1])
+                            # Try parsing as a date
+                            parsed_date = parse_date_string(day_word, now)
+                            if parsed_date:
+                                target_date = parsed_date
+                                reminder_text = ' '.join(words[:-2])
+                            else:
+                                # Not a recognized day or date, include it in reminder text
+                                reminder_text = ' '.join(words[:-1])
 
     if not time_part or not reminder_text:
         return None
