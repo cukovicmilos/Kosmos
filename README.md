@@ -166,7 +166,7 @@ sudo systemctl start kosmos-bot
 
 ### Reminders not sending
 - Check that scheduler is running (you'll see "Reminder scheduler started" in logs)
-- Check logs in `log/bot.log` for errors
+- Check logs in `log/app.log` for errors
 
 ### Time parsing issues
 - Time must be at the end of the message

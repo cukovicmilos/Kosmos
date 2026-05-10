@@ -53,7 +53,7 @@ sudo systemctl restart kosmos-bot
 sudo systemctl status kosmos-bot
 
 # Pregledaj logove
-tail -f /var/www/html/kosmos/log/bot.log
+tail -f /var/www/html/kosmos/log/app.log
 ```
 
 Servis je konfigurisan da se automatski pokreće pri boot-u i restartuje ako padne.
