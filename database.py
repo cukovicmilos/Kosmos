@@ -15,6 +15,36 @@ from config import DB_FULL_PATH
 logger = logging.getLogger(__name__)
 
 
+def parse_db_datetime(value) -> datetime:
+    """
+    Parse a datetime value stored in the database.
+
+    Tolerates format variations: datetime objects, ISO strings with/without
+    microseconds, with 'T' or space separator, and trailing timezone offsets.
+
+    Args:
+        value: datetime object or string from the database
+
+    Returns:
+        Naive datetime object
+    """
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None) if value.tzinfo else value
+
+    time_str = str(value).strip()
+    # Remove timezone offset if present (e.g., "+01:00")
+    if '+' in time_str:
+        time_str = time_str.split('+')[0]
+
+    try:
+        return datetime.fromisoformat(time_str)
+    except ValueError:
+        # Fallback: strip microseconds and parse the standard format
+        if '.' in time_str:
+            time_str = time_str.split('.')[0]
+        return datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
+
+
 @contextmanager
 def get_db_connection():
     """
@@ -23,6 +53,11 @@ def get_db_connection():
     """
     conn = sqlite3.connect(DB_FULL_PATH)
     conn.row_factory = sqlite3.Row  # Enable column access by name
+    # Reliability pragmas: WAL for concurrent readers, busy timeout against
+    # transient locks, and FK enforcement for cascade deletes
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    conn.execute("PRAGMA foreign_keys=ON")
     try:
         yield conn
         conn.commit()
@@ -119,6 +154,26 @@ def init_database():
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_reminders_scheduled_time
             ON reminders(scheduled_time, status)
+        """)
+
+        # Create pending_messages table (message retry queue)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pending_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                message_text TEXT NOT NULL,
+                message_type TEXT DEFAULT 'reminder_confirmation',
+                parse_mode TEXT DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                retry_count INTEGER DEFAULT 0,
+                last_retry_at TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(telegram_id) ON DELETE CASCADE
+            )
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_pending_messages_user
+            ON pending_messages(user_id, created_at)
         """)
 
         # Run migrations for recurring reminders feature
@@ -223,8 +278,12 @@ def update_user_language(telegram_id: int, language: str) -> bool:
                 "UPDATE users SET language = ? WHERE telegram_id = ?",
                 (language, telegram_id)
             )
-            logger.info(f"User {telegram_id} language updated to {language}")
-            return True
+            updated = cursor.rowcount > 0
+            if updated:
+                logger.info(f"User {telegram_id} language updated to {language}")
+            else:
+                logger.warning(f"Cannot update language - user {telegram_id} not found")
+            return updated
     except Exception as e:
         logger.error(f"Error updating language for user {telegram_id}: {e}")
         return False
@@ -239,8 +298,12 @@ def update_user_time_format(telegram_id: int, time_format: str) -> bool:
                 "UPDATE users SET time_format = ? WHERE telegram_id = ?",
                 (time_format, telegram_id)
             )
-            logger.info(f"User {telegram_id} time format updated to {time_format}")
-            return True
+            updated = cursor.rowcount > 0
+            if updated:
+                logger.info(f"User {telegram_id} time format updated to {time_format}")
+            else:
+                logger.warning(f"Cannot update time format - user {telegram_id} not found")
+            return updated
     except Exception as e:
         logger.error(f"Error updating time format for user {telegram_id}: {e}")
         return False
@@ -255,8 +318,12 @@ def update_user_timezone(telegram_id: int, timezone: str) -> bool:
                 "UPDATE users SET timezone = ? WHERE telegram_id = ?",
                 (timezone, telegram_id)
             )
-            logger.info(f"User {telegram_id} timezone updated to {timezone}")
-            return True
+            updated = cursor.rowcount > 0
+            if updated:
+                logger.info(f"User {telegram_id} timezone updated to {timezone}")
+            else:
+                logger.warning(f"Cannot update timezone - user {telegram_id} not found")
+            return updated
     except Exception as e:
         logger.error(f"Error updating timezone for user {telegram_id}: {e}")
         return False
@@ -363,7 +430,7 @@ def get_pending_reminders() -> List[Dict[str, Any]]:
             # Fetch all pending reminders - we'll filter by timezone in Python
             # This is necessary because each user may have a different timezone
             cursor.execute("""
-                SELECT r.*, u.timezone
+                SELECT r.*, u.timezone, u.language
                 FROM reminders r
                 JOIN users u ON r.user_id = u.telegram_id
                 WHERE r.status = 'pending'
@@ -388,15 +455,7 @@ def get_pending_reminders() -> List[Dict[str, Any]]:
                 now_in_user_tz = datetime.now(tz).replace(tzinfo=None)
 
                 # Parse scheduled_time (stored as string in user's local time)
-                # Handle various formats: with/without microseconds, with/without timezone
-                time_str = reminder['scheduled_time']
-                # Remove timezone info if present (e.g., "+01:00")
-                if '+' in time_str:
-                    time_str = time_str.split('+')[0]
-                # Remove microseconds if present
-                if '.' in time_str:
-                    time_str = time_str.split('.')[0]
-                scheduled_time = datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
+                scheduled_time = parse_db_datetime(reminder['scheduled_time'])
 
                 # Check if reminder is due in user's timezone
                 if scheduled_time <= now_in_user_tz:
@@ -426,8 +485,12 @@ def update_reminder_status(reminder_id: int, status: str) -> bool:
                 "UPDATE reminders SET status = ? WHERE id = ?",
                 (status, reminder_id)
             )
-            logger.info(f"Reminder {reminder_id} status updated to {status}")
-            return True
+            updated = cursor.rowcount > 0
+            if updated:
+                logger.info(f"Reminder {reminder_id} status updated to {status}")
+            else:
+                logger.warning(f"Cannot update status - reminder {reminder_id} not found")
+            return updated
     except Exception as e:
         logger.error(f"Error updating reminder {reminder_id}: {e}")
         return False
@@ -452,8 +515,12 @@ def update_reminder_time(reminder_id: int, new_scheduled_time: datetime) -> bool
                 SET scheduled_time = ?, status = 'pending'
                 WHERE id = ?
             """, (new_scheduled_time, reminder_id))
-            logger.info(f"Reminder {reminder_id} rescheduled to {new_scheduled_time}")
-            return True
+            updated = cursor.rowcount > 0
+            if updated:
+                logger.info(f"Reminder {reminder_id} rescheduled to {new_scheduled_time}")
+            else:
+                logger.warning(f"Cannot reschedule - reminder {reminder_id} not found")
+            return updated
     except Exception as e:
         logger.error(f"Error rescheduling reminder {reminder_id}: {e}")
         return False
@@ -514,8 +581,12 @@ def update_reminder(
             query = f"UPDATE reminders SET {', '.join(updates)} WHERE id = ?"
             cursor.execute(query, params)
 
-            logger.info(f"Reminder {reminder_id} updated: text={message_text is not None}, time={scheduled_time is not None}")
-            return True
+            updated = cursor.rowcount > 0
+            if updated:
+                logger.info(f"Reminder {reminder_id} updated: text={message_text is not None}, time={scheduled_time is not None}")
+            else:
+                logger.warning(f"Cannot update - reminder {reminder_id} not found")
+            return updated
     except Exception as e:
         logger.error(f"Error updating reminder {reminder_id}: {e}")
         return False

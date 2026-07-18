@@ -5,7 +5,7 @@ Handles /recurring command with conversation flow for creating recurring reminde
 
 import json
 import logging
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 import pytz
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -16,10 +16,12 @@ from telegram.ext import (
     MessageHandler,
     filters
 )
+from telegram.helpers import escape_markdown
 
 from database import create_reminder, get_user
-from i18n import get_text
+from i18n import get_text, WEEKDAY_SHORT_KEYS, WEEKDAY_NAME_KEYS
 from parsers.time_parser import parse_time
+from scheduler import calculate_first_occurrence
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,25 @@ logger = logging.getLogger(__name__)
     CONFIRM
 ) = range(9)
 
+# Ordered weekday/i18n-key pairs for the selection keyboard
+WEEKDAY_KEYS = [(day, WEEKDAY_SHORT_KEYS[day]) for day in (
+    "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"
+)]
+
+
+def _get_user_language(user_id: int) -> str:
+    """Get the user's language preference (defaults to English)."""
+    user = get_user(user_id)
+    return user.get("language", "en") if user else "en"
+
+
+def _localize_days(day_names, language: str) -> str:
+    """Convert internal weekday names to a localized comma-separated list."""
+    return ', '.join(
+        get_text(WEEKDAY_NAME_KEYS.get(day, "weekday_name_mon"), language)
+        for day in day_names
+    )
+
 
 async def recurring_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -45,7 +66,7 @@ async def recurring_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = get_user(user_id)
 
     if not user:
-        await update.message.reply_text("Molim te prvo pokreni bota sa /start")
+        await update.message.reply_text(get_text("recurring_need_start", "en"))
         return ConversationHandler.END
 
     user_lang = user.get('language', 'en')
@@ -54,9 +75,7 @@ async def recurring_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['recurring'] = {}
 
     await update.message.reply_text(
-        "📋 *Kreiranje ponavljajućeg podsetnika*\n\n"
-        "Unesi tekst podsetnika:\n"
-        "_/cancel za otkazivanje_",
+        get_text("recurring_prompt_message", user_lang),
         parse_mode="Markdown"
     )
 
@@ -67,10 +86,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Handle reminder message text input.
     """
+    user_lang = _get_user_language(update.effective_user.id)
     message_text = update.message.text.strip()
 
     if not message_text:
-        await update.message.reply_text("Poruka ne može biti prazna. Pokušaj ponovo:")
+        await update.message.reply_text(get_text("recurring_empty_message", user_lang))
         return MESSAGE
 
     # Save message to context
@@ -79,22 +99,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Show recurrence type options with cancel button
     keyboard = [
         [
-            InlineKeyboardButton("📅 Svaki dan", callback_data="rec_type_daily"),
-            InlineKeyboardButton("🔢 Svaki X dan", callback_data="rec_type_interval"),
+            InlineKeyboardButton(get_text("rec_type_daily_button", user_lang), callback_data="rec_type_daily"),
+            InlineKeyboardButton(get_text("rec_type_interval_button", user_lang), callback_data="rec_type_interval"),
         ],
         [
-            InlineKeyboardButton("📆 Dani u nedelji", callback_data="rec_type_weekly"),
-            InlineKeyboardButton("📌 Mesečno", callback_data="rec_type_monthly"),
+            InlineKeyboardButton(get_text("rec_type_weekly_button", user_lang), callback_data="rec_type_weekly"),
+            InlineKeyboardButton(get_text("rec_type_monthly_button", user_lang), callback_data="rec_type_monthly"),
         ],
         [
-            InlineKeyboardButton("❌ Otkaži", callback_data="rec_type_cancel"),
+            InlineKeyboardButton(get_text("cancel_button", user_lang), callback_data="rec_type_cancel"),
         ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
+    safe_text = escape_markdown(message_text, version=1)
     await update.message.reply_text(
-        f"✅ Podsetnik: *{message_text}*\n\n"
-        "Izaberi tip ponavljanja:",
+        get_text("recurring_choose_type", user_lang, message_text=safe_text),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
@@ -109,21 +129,25 @@ async def handle_recurrence_type(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     await query.answer()
 
+    user_lang = _get_user_language(update.effective_user.id)
     rec_type = query.data.replace("rec_type_", "")
 
     if rec_type == "cancel":
-        await query.edit_message_text("❌ Otkazano. Koristi /recurring da počneš ponovo.")
+        await query.edit_message_text(get_text("recurring_cancelled", user_lang))
         context.user_data.pop('recurring', None)
         return ConversationHandler.END
 
     context.user_data['recurring']['type'] = rec_type
 
+    type_set_text = get_text(
+        "recurring_type_set", user_lang,
+        type_label=get_text(f"rec_type_label_{rec_type}", user_lang)
+    )
+
     if rec_type == "daily":
         # Go directly to time input
         await query.edit_message_text(
-            "✅ Tip: *Svaki dan*\n\n"
-            "Unesi vreme (npr. 09:00, 14:30):\n"
-            "_/cancel za otkazivanje_",
+            type_set_text + get_text("recurring_time_prompt", user_lang),
             parse_mode="Markdown"
         )
         return TIME_INPUT
@@ -131,9 +155,7 @@ async def handle_recurrence_type(update: Update, context: ContextTypes.DEFAULT_T
     elif rec_type == "interval":
         # Ask for number of days
         await query.edit_message_text(
-            "✅ Tip: *Svaki X dan*\n\n"
-            "Unesi broj dana (npr. 3 za svaka 3 dana):\n"
-            "_/cancel za otkazivanje_",
+            type_set_text + get_text("recurring_interval_prompt", user_lang),
             parse_mode="Markdown"
         )
         return INTERVAL_DAYS
@@ -141,12 +163,10 @@ async def handle_recurrence_type(update: Update, context: ContextTypes.DEFAULT_T
     elif rec_type == "weekly":
         # Show day selection
         context.user_data['recurring']['selected_days'] = []
-        keyboard = create_weekday_keyboard([])
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = InlineKeyboardMarkup(create_weekday_keyboard([], user_lang))
 
         await query.edit_message_text(
-            "✅ Tip: *Dani u nedelji*\n\n"
-            "Izaberi dane (možeš više):",
+            type_set_text + get_text("recurring_select_days", user_lang),
             parse_mode="Markdown",
             reply_markup=reply_markup
         )
@@ -155,35 +175,23 @@ async def handle_recurrence_type(update: Update, context: ContextTypes.DEFAULT_T
     elif rec_type == "monthly":
         # Ask for day of month
         await query.edit_message_text(
-            "✅ Tip: *Mesečno*\n\n"
-            "Unesi dan u mesecu (1-31):\n"
-            "_/cancel za otkazivanje_",
+            type_set_text + get_text("recurring_monthly_prompt", user_lang),
             parse_mode="Markdown"
         )
         return MONTHLY_DAY
 
 
-def create_weekday_keyboard(selected_days):
+def create_weekday_keyboard(selected_days, language: str = "en"):
     """
     Create inline keyboard for weekday selection with checkmarks.
     """
-    days = [
-        ("Pon", "monday"),
-        ("Uto", "tuesday"),
-        ("Sre", "wednesday"),
-        ("Čet", "thursday"),
-        ("Pet", "friday"),
-        ("Sub", "saturday"),
-        ("Ned", "sunday")
-    ]
-
     keyboard = []
     row = []
 
-    for label, day in days:
+    for day, label_key in WEEKDAY_KEYS:
         checkmark = "✓ " if day in selected_days else ""
         button = InlineKeyboardButton(
-            f"{checkmark}{label}",
+            f"{checkmark}{get_text(label_key, language)}",
             callback_data=f"weekday_{day}"
         )
         row.append(button)
@@ -197,8 +205,8 @@ def create_weekday_keyboard(selected_days):
 
     # Add "Done" and "Cancel" buttons
     keyboard.append([
-        InlineKeyboardButton("✅ Gotovo", callback_data="weekday_done"),
-        InlineKeyboardButton("❌ Otkaži", callback_data="weekday_cancel"),
+        InlineKeyboardButton(get_text("done_button", language), callback_data="weekday_done"),
+        InlineKeyboardButton(get_text("cancel_button", language), callback_data="weekday_cancel"),
     ])
 
     return keyboard
@@ -211,8 +219,10 @@ async def handle_weekday_selection(update: Update, context: ContextTypes.DEFAULT
     query = update.callback_query
     await query.answer()
 
+    user_lang = _get_user_language(update.effective_user.id)
+
     if query.data == "weekday_cancel":
-        await query.edit_message_text("❌ Otkazano. Koristi /recurring da počneš ponovo.")
+        await query.edit_message_text(get_text("recurring_cancelled", user_lang))
         context.user_data.pop('recurring', None)
         return ConversationHandler.END
 
@@ -220,14 +230,12 @@ async def handle_weekday_selection(update: Update, context: ContextTypes.DEFAULT
         selected_days = context.user_data['recurring'].get('selected_days', [])
 
         if not selected_days:
-            await query.answer("Molim te izaberi bar jedan dan!", show_alert=True)
+            await query.answer(get_text("recurring_select_one_day", user_lang), show_alert=True)
             return WEEKLY_DAYS
 
         # Save and proceed to time input
         await query.edit_message_text(
-            f"✅ Dani: *{', '.join([d.capitalize() for d in selected_days])}*\n\n"
-            "Unesi vreme (npr. 09:00, 14:30):\n"
-            "_/cancel za otkazivanje_",
+            get_text("recurring_days_set", user_lang, days=_localize_days(selected_days, user_lang)),
             parse_mode="Markdown"
         )
         return TIME_INPUT
@@ -244,8 +252,7 @@ async def handle_weekday_selection(update: Update, context: ContextTypes.DEFAULT
     context.user_data['recurring']['selected_days'] = selected_days
 
     # Update keyboard
-    keyboard = create_weekday_keyboard(selected_days)
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = InlineKeyboardMarkup(create_weekday_keyboard(selected_days, user_lang))
 
     await query.edit_message_reply_markup(reply_markup=reply_markup)
 
@@ -256,29 +263,27 @@ async def handle_interval_days(update: Update, context: ContextTypes.DEFAULT_TYP
     """
     Handle interval days input.
     """
+    user_lang = _get_user_language(update.effective_user.id)
+
     try:
         days = int(update.message.text.strip())
 
         if days < 1 or days > 365:
-            await update.message.reply_text(
-                "Broj dana mora biti između 1 i 365. Pokušaj ponovo:"
-            )
+            await update.message.reply_text(get_text("recurring_interval_invalid", user_lang))
             return INTERVAL_DAYS
 
         context.user_data['recurring']['interval'] = days
 
+        interval_label = get_text("recurring_interval_set", user_lang, days=days)
         await update.message.reply_text(
-            f"✅ Interval: *Svaka {days} dana*\n\n"
-            "Unesi vreme (npr. 09:00, 14:30):\n"
-            "_/cancel za otkazivanje_",
+            f"✅ *{interval_label}*\n\n"
+            + get_text("recurring_time_prompt", user_lang),
             parse_mode="Markdown"
         )
         return TIME_INPUT
 
     except ValueError:
-        await update.message.reply_text(
-            "Molim te unesi validan broj. Pokušaj ponovo:"
-        )
+        await update.message.reply_text(get_text("recurring_invalid_number", user_lang))
         return INTERVAL_DAYS
 
 
@@ -286,29 +291,27 @@ async def handle_monthly_day(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """
     Handle monthly day input.
     """
+    user_lang = _get_user_language(update.effective_user.id)
+
     try:
         day = int(update.message.text.strip())
 
         if day < 1 or day > 31:
-            await update.message.reply_text(
-                "Dan mora biti između 1 i 31. Pokušaj ponovo:"
-            )
+            await update.message.reply_text(get_text("recurring_day_invalid", user_lang))
             return MONTHLY_DAY
 
         context.user_data['recurring']['day_of_month'] = day
 
+        day_label = get_text("recurring_monthday_set", user_lang, day=day)
         await update.message.reply_text(
-            f"✅ Dan u mesecu: *{day}.*\n\n"
-            "Unesi vreme (npr. 09:00, 14:30):\n"
-            "_/cancel za otkazivanje_",
+            f"✅ *{day_label}*\n\n"
+            + get_text("recurring_time_prompt", user_lang),
             parse_mode="Markdown"
         )
         return TIME_INPUT
 
     except ValueError:
-        await update.message.reply_text(
-            "Molim te unesi validan broj. Pokušaj ponovo:"
-        )
+        await update.message.reply_text(get_text("recurring_invalid_number", user_lang))
         return MONTHLY_DAY
 
 
@@ -317,16 +320,13 @@ async def handle_time_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Handle time input and show duration choice.
     """
     time_str = update.message.text.strip()
-    user_id = update.effective_user.id
-    user = get_user(user_id)
+    user_lang = _get_user_language(update.effective_user.id)
 
     # Parse time
     parsed_time = parse_time(time_str)
 
     if not parsed_time:
-        await update.message.reply_text(
-            "❌ Neispravan format vremena. Pokušaj ponovo (npr. 09:00, 14:30):"
-        )
+        await update.message.reply_text(get_text("recurring_time_invalid", user_lang))
         return TIME_INPUT
 
     context.user_data['recurring']['time'] = parsed_time
@@ -334,25 +334,25 @@ async def handle_time_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Show duration choice
     keyboard = [
         [
-            InlineKeyboardButton("♾️ Zauvek", callback_data="duration_forever"),
+            InlineKeyboardButton(get_text("duration_forever_button", user_lang), callback_data="duration_forever"),
         ],
         [
-            InlineKeyboardButton("7 dana", callback_data="duration_7"),
-            InlineKeyboardButton("14 dana", callback_data="duration_14"),
+            InlineKeyboardButton(get_text("duration_days_button", user_lang, days=7), callback_data="duration_7"),
+            InlineKeyboardButton(get_text("duration_days_button", user_lang, days=14), callback_data="duration_14"),
         ],
         [
-            InlineKeyboardButton("30 dana", callback_data="duration_30"),
-            InlineKeyboardButton("📝 Unesi broj", callback_data="duration_custom"),
+            InlineKeyboardButton(get_text("duration_days_button", user_lang, days=30), callback_data="duration_30"),
+            InlineKeyboardButton(get_text("duration_custom_button", user_lang), callback_data="duration_custom"),
         ],
         [
-            InlineKeyboardButton("❌ Otkaži", callback_data="duration_cancel"),
+            InlineKeyboardButton(get_text("cancel_button", user_lang), callback_data="duration_cancel"),
         ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
+    time_label = get_text("recurring_summary_time", user_lang, time=parsed_time.strftime('%H:%M'))
     await update.message.reply_text(
-        f"✅ Vreme: *{parsed_time.strftime('%H:%M')}*\n\n"
-        "Na koliko dana želiš da se ponavlja?",
+        f"✅ {time_label}\n\n" + get_text("recurring_duration_prompt", user_lang),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
@@ -367,17 +367,17 @@ async def handle_duration_choice(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     await query.answer()
 
+    user_lang = _get_user_language(update.effective_user.id)
     choice = query.data.replace("duration_", "")
 
     if choice == "cancel":
-        await query.edit_message_text("❌ Otkazano. Koristi /recurring da počneš ponovo.")
+        await query.edit_message_text(get_text("recurring_cancelled", user_lang))
         context.user_data.pop('recurring', None)
         return ConversationHandler.END
 
     if choice == "custom":
         await query.edit_message_text(
-            "Unesi broj dana (1-365):\n"
-            "_/cancel za otkazivanje_",
+            get_text("recurring_duration_custom_prompt", user_lang),
             parse_mode="Markdown"
         )
         return DURATION_INPUT
@@ -387,35 +387,29 @@ async def handle_duration_choice(update: Update, context: ContextTypes.DEFAULT_T
     else:
         context.user_data['recurring']['duration_days'] = int(choice)
 
-    return await _show_confirmation(query, context)
+    return await _show_confirmation(query, context, user_lang)
 
 
 async def handle_duration_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Handle custom duration input (number of days).
     """
+    user_lang = _get_user_language(update.effective_user.id)
+
     try:
         days = int(update.message.text.strip())
 
         if days < 1 or days > 365:
-            await update.message.reply_text(
-                "Broj dana mora biti između 1 i 365. Pokušaj ponovo:"
-            )
+            await update.message.reply_text(get_text("recurring_interval_invalid", user_lang))
             return DURATION_INPUT
 
         context.user_data['recurring']['duration_days'] = days
 
         # Build and send confirmation summary
         rec_data = context.user_data['recurring']
-        summary = _build_summary(rec_data)
+        summary = _build_summary(rec_data, user_lang)
 
-        keyboard = [
-            [
-                InlineKeyboardButton("✅ Potvrdi", callback_data="confirm_yes"),
-                InlineKeyboardButton("❌ Otkaži", callback_data="confirm_no"),
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        reply_markup = _build_confirm_keyboard(user_lang)
 
         await update.message.reply_text(
             summary,
@@ -426,56 +420,64 @@ async def handle_duration_input(update: Update, context: ContextTypes.DEFAULT_TY
         return CONFIRM
 
     except ValueError:
-        await update.message.reply_text(
-            "Molim te unesi validan broj. Pokušaj ponovo:"
-        )
+        await update.message.reply_text(get_text("recurring_invalid_number", user_lang))
         return DURATION_INPUT
 
 
-def _build_summary(rec_data):
+def _build_confirm_keyboard(language: str) -> InlineKeyboardMarkup:
+    """Build the confirm/cancel keyboard for the final confirmation step."""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(get_text("confirm_yes_button", language), callback_data="confirm_yes"),
+            InlineKeyboardButton(get_text("cancel_button", language), callback_data="confirm_no"),
+        ]
+    ])
+
+
+def _build_summary(rec_data, language: str = "en"):
     """Build confirmation summary text from recurring data."""
     rec_type = rec_data['type']
     parsed_time = rec_data['time']
 
     summary_lines = [
-        "📋 *Pregled ponavljajućeg podsetnika*\n",
-        f"💬 Poruka: {rec_data['message']}",
-        f"🕐 Vreme: {parsed_time.strftime('%H:%M')}",
+        get_text("recurring_summary_title", language),
+        get_text("recurring_summary_message", language, message=rec_data['message']),
+        get_text("recurring_summary_time", language, time=parsed_time.strftime('%H:%M')),
     ]
 
     if rec_type == "daily":
-        summary_lines.append("🔁 Ponavljanje: Svaki dan")
+        recurrence_desc = get_text("recurring_every_day", language)
     elif rec_type == "interval":
-        days = rec_data['interval']
-        summary_lines.append(f"🔁 Ponavljanje: Svaka {days} dana")
+        recurrence_desc = get_text("recurring_every_x_days", language, days=rec_data['interval'])
     elif rec_type == "weekly":
-        days_str = ', '.join([d.capitalize() for d in rec_data['selected_days']])
-        summary_lines.append(f"🔁 Ponavljanje: {days_str}")
+        recurrence_desc = _localize_days(rec_data['selected_days'], language)
     elif rec_type == "monthly":
-        day = rec_data['day_of_month']
-        summary_lines.append(f"🔁 Ponavljanje: Svakog {day}. u mesecu")
+        recurrence_desc = get_text("recurring_monthly_desc", language, day=rec_data['day_of_month'])
+    else:
+        recurrence_desc = ""
+
+    if recurrence_desc:
+        summary_lines.append(
+            get_text("recurring_summary_recurrence", language, recurrence=recurrence_desc)
+        )
 
     duration_days = rec_data.get('duration_days')
     if duration_days:
-        summary_lines.append(f"⏳ Trajanje: {duration_days} dana")
+        duration_desc = get_text("recurring_duration_days", language, days=duration_days)
     else:
-        summary_lines.append("⏳ Trajanje: Zauvek")
+        duration_desc = get_text("recurring_duration_forever", language)
+    summary_lines.append(
+        get_text("recurring_summary_duration", language, duration=duration_desc)
+    )
 
     return '\n'.join(summary_lines)
 
 
-async def _show_confirmation(query, context):
+async def _show_confirmation(query, context, user_lang: str):
     """Show confirmation summary after duration choice."""
     rec_data = context.user_data['recurring']
-    summary = _build_summary(rec_data)
-
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ Potvrdi", callback_data="confirm_yes"),
-            InlineKeyboardButton("❌ Otkaži", callback_data="confirm_no"),
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    summary = _build_summary(rec_data, user_lang)
+    reply_markup = _build_confirm_keyboard(user_lang)
 
     await query.edit_message_text(
         summary,
@@ -493,15 +495,17 @@ async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
 
+    user_id = update.effective_user.id
+    user_lang = _get_user_language(user_id)
+
     if query.data == "confirm_no":
-        await query.edit_message_text("❌ Otkazano. Koristi /recurring da počneš ponovo.")
+        await query.edit_message_text(get_text("recurring_cancelled", user_lang))
         context.user_data.pop('recurring', None)
         return ConversationHandler.END
 
     # Create recurring reminder
-    user_id = update.effective_user.id
     user = get_user(user_id)
-    user_tz = user.get('timezone', 'Europe/Belgrade')
+    user_tz = user.get('timezone', 'Europe/Belgrade') if user else 'Europe/Belgrade'
 
     rec_data = context.user_data['recurring']
     rec_type = rec_data['type']
@@ -515,23 +519,19 @@ async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE
         tz = pytz.timezone("Europe/Belgrade")
     now = datetime.now(tz).replace(tzinfo=None)  # Naive datetime in user's timezone
 
-    # For interval type, first occurrence is X days from now
-    if rec_type == "interval":
-        interval = rec_data['interval']
-        # Check if today's time is still valid, otherwise add interval days
-        base_time = datetime.combine(now.date(), reminder_time)
-        if base_time <= now:
-            # Today's time has passed, schedule for interval days from tomorrow
-            scheduled_datetime = base_time + timedelta(days=interval)
-        else:
-            # Today's time is still valid, but for interval we start from interval days
-            scheduled_datetime = base_time + timedelta(days=interval)
-    else:
-        # For other types: today or tomorrow based on time
-        scheduled_datetime = datetime.combine(now.date(), reminder_time)
-        # If time has passed today, schedule for tomorrow
-        if scheduled_datetime <= now:
-            scheduled_datetime += timedelta(days=1)
+    # First occurrence respects the recurrence configuration:
+    # - interval: today if time is still in the future, otherwise +N days
+    # - weekly: first selected weekday at the given time
+    # - monthly: first date with the configured day of month
+    # - daily: today or tomorrow
+    scheduled_datetime = calculate_first_occurrence(
+        rec_type,
+        reminder_time,
+        now,
+        recurrence_interval=rec_data.get('interval'),
+        recurrence_days=rec_data.get('selected_days'),
+        recurrence_day_of_month=rec_data.get('day_of_month')
+    )
 
     # Calculate end date if duration specified
     duration_days = rec_data.get('duration_days')
@@ -568,16 +568,16 @@ async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE
         next_time_str = scheduled_datetime.strftime('%d.%m.%Y u %H:%M')
         end_info = ""
         if recurrence_end_date:
-            end_info = f"\n⏳ Do: {recurrence_end_date.strftime('%d.%m.%Y.')}"
+            end_info = get_text(
+                "recurring_created_end_info", user_lang,
+                end_date=recurrence_end_date.strftime('%d.%m.%Y.')
+            )
         await query.edit_message_text(
-            f"✅ *Ponavljajući podsetnik kreiran!*\n\n"
-            f"Sledeći podsetnik: {next_time_str}{end_info}",
+            get_text("recurring_created", user_lang, next_time=next_time_str, end_info=end_info),
             parse_mode="Markdown"
         )
     else:
-        await query.edit_message_text(
-            "❌ Greška prilikom kreiranja podsetnika. Pokušaj ponovo."
-        )
+        await query.edit_message_text(get_text("recurring_create_error", user_lang))
 
     # Clean up
     context.user_data.pop('recurring', None)
@@ -588,9 +588,8 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Cancel the conversation.
     """
-    await update.message.reply_text(
-        "❌ Otkazano. Koristi /recurring da počneš ponovo."
-    )
+    user_lang = _get_user_language(update.effective_user.id)
+    await update.message.reply_text(get_text("recurring_cancelled", user_lang))
     context.user_data.pop('recurring', None)
     return ConversationHandler.END
 
@@ -599,8 +598,6 @@ def register_handlers(application):
     """
     Register recurring reminder handlers.
     """
-    from telegram.ext import CommandHandler, MessageHandler, filters
-
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("recurring", recurring_command),

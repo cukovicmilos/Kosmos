@@ -8,7 +8,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from telegram import Bot
-from telegram.error import TelegramError, NetworkError, TimedOut
+from telegram.error import TelegramError, NetworkError, TimedOut, Forbidden
 
 from database import get_db_connection
 
@@ -55,7 +55,9 @@ def should_retry_now(last_retry_at: Optional[str], retry_count: int) -> bool:
         return True
 
     required_delay = get_backoff_delay(retry_count)
-    elapsed = (datetime.now() - last_retry).total_seconds()
+    # last_retry_at is written via SQLite CURRENT_TIMESTAMP (UTC),
+    # so compare against UTC now to keep backoff delays correct
+    elapsed = (datetime.utcnow() - last_retry).total_seconds()
 
     return elapsed >= required_delay
 
@@ -63,33 +65,15 @@ def should_retry_now(last_retry_at: Optional[str], retry_count: int) -> bool:
 def create_pending_message_table():
     """
     Create pending_messages table if it doesn't exist.
-    Call this during database initialization.
+
+    The canonical schema lives in database.init_database(); this wrapper
+    is kept for backward compatibility with older patch scripts.
     """
+    from database import init_database
     try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS pending_messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    message_text TEXT NOT NULL,
-                    message_type TEXT DEFAULT 'reminder_confirmation',
-                    parse_mode TEXT DEFAULT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    retry_count INTEGER DEFAULT 0,
-                    last_retry_at TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(telegram_id) ON DELETE CASCADE
-                )
-            """)
-            
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_pending_messages_user
-                ON pending_messages(user_id, created_at)
-            """)
-            
-            logger.info("Pending messages table created/verified")
-            return True
+        init_database()
+        logger.info("Pending messages table created/verified")
+        return True
     except Exception as e:
         logger.error(f"Error creating pending_messages table: {e}")
         return False
@@ -255,6 +239,13 @@ async def send_pending_message(bot: Bot, message: Dict[str, Any]):
         delete_pending_message(message_id)
         logger.info(f"Pending message {message_id} sent successfully to user {user_id} after {retry_count} retries")
 
+    except Forbidden as e:
+        # User blocked the bot - delivery will never succeed, drop the message
+        delete_pending_message(message_id)
+        logger.warning(
+            f"User {user_id} blocked the bot - pending message {message_id} dropped: {e}"
+        )
+
     except (NetworkError, TimedOut) as e:
         # Network error - update retry count and try again later
         update_retry_attempt(message_id)
@@ -282,7 +273,8 @@ def cleanup_old_messages(days: int = 7):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cutoff_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
+            # created_at is stored via SQLite CURRENT_TIMESTAMP (UTC)
+            cutoff_date = (datetime.utcnow() - timedelta(days=days)).strftime('%Y-%m-%d %H:%M:%S')
             
             cursor.execute("""
                 DELETE FROM pending_messages

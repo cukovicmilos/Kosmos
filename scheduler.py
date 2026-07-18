@@ -9,11 +9,12 @@ import calendar
 from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Bot
-from telegram.error import NetworkError, TimedOut, TelegramError
+from telegram import Bot
+from telegram.error import NetworkError, TimedOut, TelegramError, BadRequest, Forbidden
+from telegram.helpers import escape_markdown
 
-from database import get_pending_reminders, update_reminder_status, update_reminder_time
-from i18n import get_text
+from database import get_pending_reminders, update_reminder_status, update_reminder_time, parse_db_datetime
+from keyboards import build_notification_keyboard
 from message_queue import process_pending_messages, cleanup_old_messages
 
 logger = logging.getLogger(__name__)
@@ -40,13 +41,7 @@ def calculate_next_occurrence(reminder: dict) -> datetime:
     Returns:
         Next scheduled datetime
     """
-    # Parse scheduled_time, handling microseconds and timezone if present
-    time_str = reminder['scheduled_time']
-    if '+' in time_str:
-        time_str = time_str.split('+')[0]
-    if '.' in time_str:
-        time_str = time_str.split('.')[0]
-    current_time = datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
+    current_time = parse_db_datetime(reminder['scheduled_time'])
     recurrence_type = reminder['recurrence_type']
 
     if recurrence_type == 'daily':
@@ -127,6 +122,86 @@ def calculate_next_occurrence(reminder: dict) -> datetime:
     return next_time
 
 
+def calculate_first_occurrence(
+    recurrence_type: str,
+    reminder_time,
+    now: datetime,
+    recurrence_interval: int = None,
+    recurrence_days: list = None,
+    recurrence_day_of_month: int = None
+) -> datetime:
+    """
+    Calculate the first occurrence for a newly created recurring reminder.
+
+    Args:
+        recurrence_type: 'daily', 'interval', 'weekly' or 'monthly'
+        reminder_time: datetime.time object - time of day for the reminder
+        now: Current naive datetime in the user's timezone
+        recurrence_interval: For 'interval' type - number of days between occurrences
+        recurrence_days: For 'weekly' type - list of weekday names (e.g., ['monday'])
+        recurrence_day_of_month: For 'monthly' type - day of month (1-31)
+
+    Returns:
+        First occurrence as naive datetime in the user's timezone
+    """
+    base_time = datetime.combine(now.date(), reminder_time)
+
+    if recurrence_type == 'interval':
+        # First occurrence is today if the time is still in the future,
+        # otherwise one interval from today
+        interval = recurrence_interval or 1
+        if base_time > now:
+            return base_time
+        return base_time + timedelta(days=interval)
+
+    if recurrence_type == 'weekly':
+        day_map = {
+            'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+            'friday': 4, 'saturday': 5, 'sunday': 6
+        }
+        target_days = sorted({
+            day_map[day.lower()] for day in (recurrence_days or [])
+            if isinstance(day, str) and day.lower() in day_map
+        })
+
+        if not target_days:
+            logger.error(f"Weekly reminder has no valid days: {recurrence_days}, falling back to daily")
+            return base_time + timedelta(days=1) if base_time <= now else base_time
+
+        # Pick the nearest selected weekday whose occurrence is still in the future
+        candidates = []
+        for target_day in target_days:
+            days_ahead = (target_day - now.weekday()) % 7
+            candidate = base_time + timedelta(days=days_ahead)
+            if candidate <= now:
+                candidate += timedelta(days=7)
+            candidates.append(candidate)
+        return min(candidates)
+
+    if recurrence_type == 'monthly':
+        day_of_month = recurrence_day_of_month or now.day
+
+        # Try this month first
+        max_day = calendar.monthrange(now.year, now.month)[1]
+        candidate = base_time.replace(day=min(day_of_month, max_day))
+
+        if candidate <= now:
+            # Time has passed (or day already passed) - go to next month
+            year, month = now.year, now.month + 1
+            if month > 12:
+                month = 1
+                year += 1
+            max_day = calendar.monthrange(year, month)[1]
+            candidate = candidate.replace(year=year, month=month, day=min(day_of_month, max_day))
+
+        return candidate
+
+    # 'daily' (and fallback for unknown types): today if time is in the future, else tomorrow
+    if recurrence_type != 'daily':
+        logger.error(f"Unknown recurrence type '{recurrence_type}', falling back to daily")
+    return base_time + timedelta(days=1) if base_time <= now else base_time
+
+
 async def check_and_send_reminders(bot: Bot):
     """
     Background task that checks for pending reminders and sends them.
@@ -163,52 +238,47 @@ async def send_reminder(bot: Bot, reminder: dict):
     reminder_id = reminder['id']
     message_text = reminder['message_text']
 
-    # Get user's timezone from the reminder (joined from users table)
+    # Get user's timezone and language from the reminder (joined from users table)
     user_timezone = reminder.get('timezone', 'Europe/Belgrade')
-
-    # For now, we'll use English for the notification
-    # In a future enhancement, we could join with users table to get language preference
-    # But the database query already includes timezone from the JOIN
+    user_lang = reminder.get('language', 'en')
 
     # Check if recurring (used for icon and delete button)
     is_recurring = reminder.get('is_recurring', 0)
 
+    # Escape user text for Markdown to prevent Telegram parse errors
+    # (unescaped _, *, [ etc. caused BadRequest and infinite pending retries)
+    safe_message_text = escape_markdown(message_text, version=1)
+
     # Format reminder notification message (🔁 for recurring, 🔔 for one-time)
     if is_recurring:
-        notification_text = f"🔁 {message_text}"
+        notification_text = f"🔁 {safe_message_text}"
     else:
-        notification_text = f"🔔 {message_text}"
+        notification_text = f"🔔 {safe_message_text}"
 
-    # Create inline keyboard with postpone options
-    keyboard = [
-        [
-            InlineKeyboardButton("15 min", callback_data=f"postpone_{reminder_id}_15m"),
-            InlineKeyboardButton("30 min", callback_data=f"postpone_{reminder_id}_30m"),
-            InlineKeyboardButton("1h", callback_data=f"postpone_{reminder_id}_1h"),
-        ],
-        [
-            InlineKeyboardButton("3h", callback_data=f"postpone_{reminder_id}_3h"),
-            InlineKeyboardButton("1 dan", callback_data=f"postpone_{reminder_id}_1d"),
-            InlineKeyboardButton("Drugo vreme", callback_data=f"postpone_{reminder_id}_custom"),
-        ],
-    ]
-
-    # Add delete button for recurring reminders
-    if is_recurring:
-        keyboard.append([
-            InlineKeyboardButton("🗑️ Obriši ponavljanje", callback_data=f"stop_recurring_{reminder_id}")
-        ])
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    # Create inline keyboard with postpone options (localized)
+    reply_markup = build_notification_keyboard(reminder_id, is_recurring, user_lang)
 
     try:
         # Send reminder message
-        await bot.send_message(
-            chat_id=user_id,
-            text=notification_text,
-            parse_mode="Markdown",
-            reply_markup=reply_markup
-        )
+        try:
+            await bot.send_message(
+                chat_id=user_id,
+                text=notification_text,
+                parse_mode="Markdown",
+                reply_markup=reply_markup
+            )
+        except BadRequest as markdown_error:
+            # Markdown parsing failed despite escaping - fall back to plain text
+            logger.warning(
+                f"Markdown parse failed for reminder {reminder_id}, "
+                f"retrying without parse_mode: {markdown_error}"
+            )
+            plain_text = f"🔁 {message_text}" if is_recurring else f"🔔 {message_text}"
+            await bot.send_message(
+                chat_id=user_id,
+                text=plain_text,
+                reply_markup=reply_markup
+            )
 
         if is_recurring:
             # Calculate next occurrence and reschedule
@@ -217,13 +287,8 @@ async def send_reminder(bot: Bot, reminder: dict):
             # Check if recurring period has expired (end_date set)
             end_date_str = reminder.get('recurrence_end_date')
             if end_date_str:
-                # Parse end_date (stored as string in SQLite)
                 try:
-                    if '+' in end_date_str:
-                        end_date_str = end_date_str.split('+')[0]
-                    if '.' in end_date_str:
-                        end_date_str = end_date_str.split('.')[0]
-                    end_date = datetime.strptime(end_date_str, '%Y-%m-%d %H:%M:%S')
+                    end_date = parse_db_datetime(end_date_str)
                 except (ValueError, AttributeError):
                     end_date = None
 
@@ -242,6 +307,13 @@ async def send_reminder(bot: Bot, reminder: dict):
             logger.info(f"One-time reminder {reminder_id} marked as sent")
 
         logger.info(f"Reminder {reminder_id} sent to user {user_id}")
+
+    except Forbidden as e:
+        # User blocked the bot - cancel the reminder to stop infinite retries
+        update_reminder_status(reminder_id, 'cancelled')
+        logger.warning(
+            f"User {user_id} blocked the bot - reminder {reminder_id} cancelled: {e}"
+        )
 
     except (NetworkError, TimedOut) as e:
         logger.warning(f"Network error sending reminder {reminder_id} to user {user_id}: {e}")

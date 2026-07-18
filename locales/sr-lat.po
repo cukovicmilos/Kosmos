@@ -24,7 +24,7 @@ msgstr "Sve je spremno! 🎉\n\nKoristi dugmad ispod za brzi pristup, ili mi sam
 
 # Commands help
 msgid "help_message"
-msgstr "📖 *Kosmos Pomoć*\n\n*Kreiranje podsetnika:*\nPošalji poruku sa tekstom i vremenom:\n• `Tekst podsetnika sutra 16:00`\n• `Tekst podsetnika pon 10:00`\n• `Tekst podsetnika 14:30`\n\n*Ponavljajući podsetnoci:* 🔁\nKoristi /recurring da kreiraš podsetnike koji se automatski ponavljaju:\n• Svaki dan - Svakog dana u isto vreme\n• Svaki X dan - Ponavlja se svakih N dana\n• Nedeljno - Određeni dani (Pon, Sre, Pet...)\n• Mesečno - Određeni dan u mesecu\n\n*Podržani formati vremena:*\n• Dani: sutra, prekosutra, pon/uto/sre/cet/pet/sub/ned\n• Sledeća nedelja: sl pon/uto/sre/cet/pet/sub/ned\n• Vreme: 21:00, 8, 7am, 2100, itd.\n\n*Komande:*\n/list - Prikaži sve podsetnike u budućnosti\n/recurring - Kreiraj ponavljajući podsetnik\n/settings - Promeni jezik, format vremena, vremensku zonu\n/help - Prikaži ovu pomoć\n\n*Brze akcije:*\nKoristi dugmad 'List' i 'Ponavljajući' ispod za brzi pristup."
+msgstr "📖 *Kosmos Pomoć*\n\n*Kreiranje podsetnika:*\nPošalji poruku sa tekstom i vremenom:\n• `Tekst podsetnika sutra 16:00`\n• `Tekst podsetnika pon 10:00`\n• `Tekst podsetnika 14:30`\n\n*Ponavljajući podsetnoci:* 🔁\nKoristi /recurring da kreiraš podsetnike koji se automatski ponavljaju:\n• Svaki dan - Svakog dana u isto vreme\n• Svaki X dan - Ponavlja se svakih N dana\n• Nedeljno - Određeni dani (Pon, Sre, Pet...)\n• Mesečno - Određeni dan u mesecu\n\n*Podržani formati vremena:*\n• Dani: sutra, prekosutra, pon/uto/sre/cet/pet/sub/ned\n• Sledeća nedelja: sl pon/uto/sre/cet/pet/sub/ned\n• Vreme: 21:00, 8, 7am, 2100, itd.\n\n*Komande:*\n/list - Prikaži sve podsetnike u budućnosti\n/quick - Brzi podsetnik iz najčešćih tekstova\n/recurring - Kreiraj ponavljajući podsetnik\n/settings - Promeni jezik, format vremena, vremensku zonu\n/help - Prikaži ovu pomoć\n\n*Brze akcije:*\nKoristi dugmad 'Lista', 'Brzi' i 'Ponavljajući' ispod za brzi pristup."
 
 msgid "new_reminder_prompt"
 msgstr "📝 Da kreiraš podsetnik, pošalji mi poruku u ovom formatu:\n\n`[Tvoj tekst podsetnika] [dan] [vreme]`\n\n*Primeri:*\n• Ponesi pecaljku na jezero sutra 16:00\n• Sastanak pon 10:00\n• Poziv sl pon 9:00\n• Kafa 14:30"
@@ -177,3 +177,210 @@ msgstr "⏰ *{text}*\n\nKada? Upiši vreme (npr. `sub 20:00`, `sutra 14:00`, `18
 
 msgid "quick_no_history"
 msgstr "Nemaš dovoljno podsetnika u istoriji za Quick pristup."
+
+# Recurring reminder deletion
+msgid "stop_recurring_button"
+msgstr "🗑️ Obriši ponavljanje"
+
+msgid "stop_recurring_confirm"
+msgstr "🔁 *Ponavljajući podsetnik*\n\nŽeliš li da trajno obrišeš ovaj ponavljajući podsetnik?\n_{message_text}_"
+
+msgid "recurring_deleted"
+msgstr "✅ Ponavljajući podsetnik obrisan."
+
+msgid "delete_forever_button"
+msgstr "🗑️ Obriši zauvek"
+
+msgid "cancel_button"
+msgstr "❌ Otkaži"
+
+msgid "reminder_not_found"
+msgstr "❌ Podsetnik nije pronađen."
+
+msgid "delete_error"
+msgstr "❌ Greška prilikom brisanja podsetnika."
+
+# Recurring reminder flow
+msgid "recurring_need_start"
+msgstr "Molim te prvo pokreni bota sa /start"
+
+msgid "recurring_prompt_message"
+msgstr "📋 *Kreiranje ponavljajućeg podsetnika*\n\nUnesi tekst podsetnika:\n_/cancel za otkazivanje_"
+
+msgid "recurring_empty_message"
+msgstr "Poruka ne može biti prazna. Pokušaj ponovo:"
+
+msgid "recurring_choose_type"
+msgstr "✅ Podsetnik: *{message_text}*\n\nIzaberi tip ponavljanja:"
+
+msgid "recurring_cancelled"
+msgstr "❌ Otkazano. Koristi /recurring da počneš ponovo."
+
+msgid "rec_type_daily_button"
+msgstr "📅 Svaki dan"
+
+msgid "rec_type_interval_button"
+msgstr "🔢 Svaki X dan"
+
+msgid "rec_type_weekly_button"
+msgstr "📆 Dani u nedelji"
+
+msgid "rec_type_monthly_button"
+msgstr "📌 Mesečno"
+
+msgid "rec_type_label_daily"
+msgstr "Svaki dan"
+
+msgid "rec_type_label_interval"
+msgstr "Svaki X dan"
+
+msgid "rec_type_label_weekly"
+msgstr "Dani u nedelji"
+
+msgid "rec_type_label_monthly"
+msgstr "Mesečno"
+
+msgid "recurring_type_set"
+msgstr "✅ Tip: *{type_label}*\n\n"
+
+msgid "recurring_time_prompt"
+msgstr "Unesi vreme (npr. 09:00, 14:30):\n_/cancel za otkazivanje_"
+
+msgid "recurring_interval_prompt"
+msgstr "Unesi broj dana (npr. 3 za svaka 3 dana):\n_/cancel za otkazivanje_"
+
+msgid "recurring_monthly_prompt"
+msgstr "Unesi dan u mesecu (1-31):\n_/cancel za otkazivanje_"
+
+msgid "recurring_select_days"
+msgstr "Izaberi dane (možeš više):"
+
+msgid "recurring_select_one_day"
+msgstr "Molim te izaberi bar jedan dan!"
+
+msgid "recurring_interval_invalid"
+msgstr "Broj dana mora biti između 1 i 365. Pokušaj ponovo:"
+
+msgid "recurring_day_invalid"
+msgstr "Dan mora biti između 1 i 31. Pokušaj ponovo:"
+
+msgid "recurring_invalid_number"
+msgstr "Molim te unesi validan broj. Pokušaj ponovo:"
+
+msgid "recurring_time_invalid"
+msgstr "❌ Neispravan format vremena. Pokušaj ponovo (npr. 09:00, 14:30):"
+
+msgid "recurring_interval_set"
+msgstr "Svaka {days} dana"
+
+msgid "recurring_monthday_set"
+msgstr "Dan u mesecu: {day}."
+
+msgid "recurring_days_set"
+msgstr "✅ Dani: *{days}*\n\nUnesi vreme (npr. 09:00, 14:30):\n_/cancel za otkazivanje_"
+
+msgid "recurring_duration_prompt"
+msgstr "Na koliko dana želiš da se ponavlja?"
+
+msgid "duration_forever_button"
+msgstr "♾️ Zauvek"
+
+msgid "duration_days_button"
+msgstr "{days} dana"
+
+msgid "duration_custom_button"
+msgstr "📝 Unesi broj"
+
+msgid "recurring_duration_custom_prompt"
+msgstr "Unesi broj dana (1-365):\n_/cancel za otkazivanje_"
+
+msgid "recurring_summary_title"
+msgstr "📋 *Pregled ponavljajućeg podsetnika*\n"
+
+msgid "recurring_summary_message"
+msgstr "💬 Poruka: {message}"
+
+msgid "recurring_summary_time"
+msgstr "🕐 Vreme: {time}"
+
+msgid "recurring_summary_recurrence"
+msgstr "🔁 Ponavljanje: {recurrence}"
+
+msgid "recurring_summary_duration"
+msgstr "⏳ Trajanje: {duration}"
+
+msgid "recurring_duration_forever"
+msgstr "Zauvek"
+
+msgid "recurring_duration_days"
+msgstr "{days} dana"
+
+msgid "recurring_every_day"
+msgstr "Svaki dan"
+
+msgid "recurring_every_x_days"
+msgstr "Svaka {days} dana"
+
+msgid "recurring_monthly_desc"
+msgstr "svakog {day}. u mesecu"
+
+msgid "confirm_yes_button"
+msgstr "✅ Potvrdi"
+
+msgid "recurring_created"
+msgstr "✅ *Ponavljajući podsetnik kreiran!*\n\nSledeći podsetnik: {next_time}{end_info}"
+
+msgid "recurring_created_end_info"
+msgstr "\n⏳ Do: {end_date}"
+
+msgid "recurring_create_error"
+msgstr "❌ Greška prilikom kreiranja podsetnika. Pokušaj ponovo."
+
+msgid "action_cancelled"
+msgstr "Otkazano"
+
+# Weekday names
+msgid "weekday_short_mon"
+msgstr "Pon"
+
+msgid "weekday_short_tue"
+msgstr "Uto"
+
+msgid "weekday_short_wed"
+msgstr "Sre"
+
+msgid "weekday_short_thu"
+msgstr "Čet"
+
+msgid "weekday_short_fri"
+msgstr "Pet"
+
+msgid "weekday_short_sat"
+msgstr "Sub"
+
+msgid "weekday_short_sun"
+msgstr "Ned"
+
+msgid "weekday_name_mon"
+msgstr "Ponedeljak"
+
+msgid "weekday_name_tue"
+msgstr "Utorak"
+
+msgid "weekday_name_wed"
+msgstr "Sreda"
+
+msgid "weekday_name_thu"
+msgstr "Četvrtak"
+
+msgid "weekday_name_fri"
+msgstr "Petak"
+
+msgid "weekday_name_sat"
+msgstr "Subota"
+
+msgid "weekday_name_sun"
+msgstr "Nedelja"
+
+msgid "done_button"
+msgstr "✅ Gotovo"

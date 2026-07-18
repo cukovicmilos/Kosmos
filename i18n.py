@@ -16,6 +16,27 @@ logger = logging.getLogger(__name__)
 # Structure: {language: {msgid: msgstr}}
 _translations: Dict[str, Dict[str, str]] = {}
 
+# Weekday i18n key mappings (values are msgids in .po files)
+WEEKDAY_SHORT_KEYS = {
+    'monday': 'weekday_short_mon',
+    'tuesday': 'weekday_short_tue',
+    'wednesday': 'weekday_short_wed',
+    'thursday': 'weekday_short_thu',
+    'friday': 'weekday_short_fri',
+    'saturday': 'weekday_short_sat',
+    'sunday': 'weekday_short_sun',
+}
+
+WEEKDAY_NAME_KEYS = {
+    'monday': 'weekday_name_mon',
+    'tuesday': 'weekday_name_tue',
+    'wednesday': 'weekday_name_wed',
+    'thursday': 'weekday_name_thu',
+    'friday': 'weekday_name_fri',
+    'saturday': 'weekday_name_sat',
+    'sunday': 'weekday_name_sun',
+}
+
 
 def load_translations():
     """

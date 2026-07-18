@@ -10,9 +10,10 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ConversationHandler
 import pytz
 
-from database import get_user_reminders, delete_reminder, get_user, get_reminder_by_id, update_reminder
+from database import get_user_reminders, delete_reminder, get_user, get_reminder_by_id, update_reminder, parse_db_datetime
 from parsers.time_parser import format_datetime, parse_reminder, format_reminder_confirmation
-from i18n import get_text
+from i18n import get_text, WEEKDAY_SHORT_KEYS
+from keyboards import build_delete_recurring_confirm_keyboard
 from telegram.helpers import escape_markdown
 from telegram import ForceReply
 
@@ -59,14 +60,13 @@ def format_recurrence_description(reminder: dict, language: str = "en") -> str:
     rec_type = reminder.get('recurrence_type')
 
     if rec_type == 'daily':
-        return "svaki dan" if language == "sr-lat" else "every day"
+        return get_text("recurring_every_day", language)
 
     elif rec_type == 'interval':
-        days = reminder.get('recurrence_interval', 1)
-        if language == "sr-lat":
-            return f"svaka {days} dana" if days > 1 else "svaki dan"
-        else:
-            return f"every {days} days" if days > 1 else "every day"
+        days = reminder.get('recurrence_interval', 1) or 1
+        if days > 1:
+            return get_text("recurring_every_x_days", language, days=days)
+        return get_text("recurring_every_day", language)
 
     elif rec_type == 'weekly':
         days_json = reminder.get('recurrence_days')
@@ -78,36 +78,17 @@ def format_recurrence_description(reminder: dict, language: str = "en") -> str:
         except (json.JSONDecodeError, TypeError):
             return ""
 
-        # Map day names to localized versions
-        if language == "sr-lat":
-            day_map = {
-                'monday': 'Pon', 'tuesday': 'Uto', 'wednesday': 'Sre',
-                'thursday': 'Čet', 'friday': 'Pet', 'saturday': 'Sub', 'sunday': 'Ned'
-            }
-        else:
-            day_map = {
-                'monday': 'Mon', 'tuesday': 'Tue', 'wednesday': 'Wed',
-                'thursday': 'Thu', 'friday': 'Fri', 'saturday': 'Sat', 'sunday': 'Sun'
-            }
+        day_names = [
+            get_text(WEEKDAY_SHORT_KEYS[day.lower()], language)
+            for day in days_list
+            if isinstance(day, str) and day.lower() in WEEKDAY_SHORT_KEYS
+        ]
 
-        day_names = [day_map.get(day.lower(), day) for day in days_list if day.lower() in day_map]
-        days_str = ', '.join(day_names)
-
-        return days_str if days_str else ""
+        return ', '.join(day_names)
 
     elif rec_type == 'monthly':
         day_of_month = reminder.get('recurrence_day_of_month', 1)
-        if language == "sr-lat":
-            return f"svakog {day_of_month}. u mesecu"
-        else:
-            suffix = 'th'
-            if day_of_month % 10 == 1 and day_of_month != 11:
-                suffix = 'st'
-            elif day_of_month % 10 == 2 and day_of_month != 12:
-                suffix = 'nd'
-            elif day_of_month % 10 == 3 and day_of_month != 13:
-                suffix = 'rd'
-            return f"every {day_of_month}{suffix} of month"
+        return get_text("recurring_monthly_desc", language, day=day_of_month)
 
     return ""
 
@@ -142,19 +123,7 @@ def build_reminder_list_message(
 
         # Parse scheduled_time from database (stored as local time naive datetime)
         try:
-            if isinstance(scheduled_time_str, str):
-                try:
-                    scheduled_dt = datetime.fromisoformat(scheduled_time_str)
-                except ValueError:
-                    # Fallback: strip microseconds and timezone if present
-                    time_str = scheduled_time_str
-                    if '+' in time_str:
-                        time_str = time_str.split('+')[0]
-                    if '.' in time_str:
-                        time_str = time_str.split('.')[0]
-                    scheduled_dt = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
-            else:
-                scheduled_dt = scheduled_time_str
+            scheduled_dt = parse_db_datetime(scheduled_time_str)
 
             # If naive datetime, treat it as local time (already in correct timezone)
             if scheduled_dt.tzinfo is None:
@@ -289,7 +258,6 @@ async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_lang = user.get("language", "en") if user else "en"
 
     # Get reminder to check if it's recurring
-    from database import get_reminder_by_id
     reminder = get_reminder_by_id(reminder_id)
 
     if not reminder:
@@ -301,30 +269,11 @@ async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if is_recurring:
         # Show confirmation dialog for recurring reminders
-        confirmation_text = (
-            "🔁 *Ponavljajući podsetnik*\n\n"
-            "Želiš li da trajno obrišeš ovaj ponavljajući podsetnik?"
-            if user_lang == "sr-lat" else
-            "🔁 *Recurring Reminder*\n\n"
-            "Do you want to permanently delete this recurring reminder?"
-        )
-
-        keyboard = [
-            [
-                InlineKeyboardButton(
-                    "🗑️ Obriši zauvek" if user_lang == "sr-lat" else "🗑️ Delete Forever",
-                    callback_data=f"delete_confirm_{reminder_id}"
-                ),
-                InlineKeyboardButton(
-                    "❌ Otkaži" if user_lang == "sr-lat" else "❌ Cancel",
-                    callback_data=f"delete_cancel_{reminder_id}"
-                ),
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        safe_text = escape_markdown(reminder['message_text'], version=1)
+        reply_markup = build_delete_recurring_confirm_keyboard(reminder_id, user_lang)
 
         await query.edit_message_text(
-            confirmation_text,
+            get_text("stop_recurring_confirm", user_lang, message_text=safe_text),
             parse_mode="Markdown",
             reply_markup=reply_markup
         )
@@ -404,7 +353,7 @@ async def delete_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
 
     if success:
         await query.answer(
-            "Ponavljajući podsetnik obrisan" if user_lang == "sr-lat" else "Recurring reminder deleted",
+            get_text("recurring_deleted", user_lang),
             show_alert=False
         )
 
@@ -443,13 +392,14 @@ async def delete_cancel_callback(update: Update, context: ContextTypes.DEFAULT_T
     Handle delete cancellation - go back to the list.
     """
     query = update.callback_query
-    await query.answer("Otkazano" if query.from_user.language_code == "sr" else "Cancelled")
 
     user_id = update.effective_user.id
     user = get_user(user_id)
     user_lang = user.get("language", "en") if user else "en"
     user_timezone = user.get("timezone", "Europe/Belgrade")
     user_time_format = user.get("time_format", "24h")
+
+    await query.answer(get_text("action_cancelled", user_lang))
 
     # Rebuild the list
     reminders = get_user_reminders(user_id, status="pending")

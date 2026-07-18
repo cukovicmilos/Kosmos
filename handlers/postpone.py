@@ -5,7 +5,7 @@ Handles postponing reminders when user clicks postpone buttons.
 
 import logging
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler, ConversationHandler, MessageHandler, filters
 from telegram.error import TelegramError
 import pytz
@@ -13,6 +13,8 @@ import pytz
 from database import get_reminder_by_id, update_reminder_time, get_user, create_reminder, delete_reminder
 from parsers.time_parser import parse_reminder, format_datetime, format_reminder_confirmation
 from i18n import get_text
+from keyboards import build_notification_keyboard, build_delete_recurring_confirm_keyboard
+from telegram.helpers import escape_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -241,50 +243,36 @@ async def cancel_custom_time(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return ConversationHandler.END
 
 
-def _build_recurring_notification_keyboard(reminder_id):
-    """Build the postpone + delete keyboard for a recurring reminder notification."""
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("15 min", callback_data=f"postpone_{reminder_id}_15m"),
-            InlineKeyboardButton("30 min", callback_data=f"postpone_{reminder_id}_30m"),
-            InlineKeyboardButton("1h", callback_data=f"postpone_{reminder_id}_1h"),
-        ],
-        [
-            InlineKeyboardButton("3h", callback_data=f"postpone_{reminder_id}_3h"),
-            InlineKeyboardButton("1 dan", callback_data=f"postpone_{reminder_id}_1d"),
-            InlineKeyboardButton("Drugo vreme", callback_data=f"postpone_{reminder_id}_custom"),
-        ],
-        [
-            InlineKeyboardButton("🗑️ Obriši ponavljanje", callback_data=f"stop_recurring_{reminder_id}")
-        ],
-    ])
+def _get_user_language(user_id: int) -> str:
+    """Get the user's language preference (defaults to English)."""
+    user = get_user(user_id)
+    return user.get("language", "en") if user else "en"
 
 
 async def stop_recurring_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle 'Obriši ponavljanje' button on fired recurring reminder."""
+    """Handle 'Delete recurrence' button on fired recurring reminder."""
     query = update.callback_query
     await query.answer()
 
     reminder_id = int(query.data.replace("stop_recurring_", ""))
     user_id = update.effective_user.id
+    user_lang = _get_user_language(user_id)
 
     reminder = get_reminder_by_id(reminder_id)
     if not reminder or reminder['user_id'] != user_id:
-        await query.edit_message_text("❌ Podsetnik nije pronađen.")
+        await query.edit_message_text(get_text("reminder_not_found", user_lang))
         return
 
-    keyboard = [
-        [
-            InlineKeyboardButton("🗑️ Obriši zauvek", callback_data=f"stop_recurring_confirm_{reminder_id}"),
-            InlineKeyboardButton("❌ Otkaži", callback_data=f"stop_recurring_cancel_{reminder_id}"),
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = build_delete_recurring_confirm_keyboard(
+        reminder_id,
+        user_lang,
+        confirm_callback=f"stop_recurring_confirm_{reminder_id}",
+        cancel_callback=f"stop_recurring_cancel_{reminder_id}"
+    )
 
+    safe_text = escape_markdown(reminder['message_text'], version=1)
     await query.edit_message_text(
-        f"🔁 *Ponavljajući podsetnik*\n\n"
-        f"Želiš li da trajno obrišeš ovaj ponavljajući podsetnik?\n"
-        f"_{reminder['message_text']}_",
+        get_text("stop_recurring_confirm", user_lang, message_text=safe_text),
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
@@ -297,18 +285,19 @@ async def stop_recurring_confirm_callback(update: Update, context: ContextTypes.
 
     reminder_id = int(query.data.replace("stop_recurring_confirm_", ""))
     user_id = update.effective_user.id
+    user_lang = _get_user_language(user_id)
 
     reminder = get_reminder_by_id(reminder_id)
     if not reminder or reminder['user_id'] != user_id:
-        await query.edit_message_text("❌ Podsetnik nije pronađen.")
+        await query.edit_message_text(get_text("reminder_not_found", user_lang))
         return
 
     success = delete_reminder(reminder_id)
     if success:
-        await query.edit_message_text("✅ Ponavljajući podsetnik obrisan.")
+        await query.edit_message_text(get_text("recurring_deleted", user_lang))
         logger.info(f"User {user_id} stopped recurring reminder {reminder_id} from notification")
     else:
-        await query.edit_message_text("❌ Greška prilikom brisanja podsetnika.")
+        await query.edit_message_text(get_text("delete_error", user_lang))
 
 
 async def stop_recurring_cancel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -318,15 +307,17 @@ async def stop_recurring_cancel_callback(update: Update, context: ContextTypes.D
 
     reminder_id = int(query.data.replace("stop_recurring_cancel_", ""))
     user_id = update.effective_user.id
+    user_lang = _get_user_language(user_id)
 
     reminder = get_reminder_by_id(reminder_id)
     if not reminder or reminder['user_id'] != user_id:
-        await query.edit_message_text("❌ Podsetnik nije pronađen.")
+        await query.edit_message_text(get_text("reminder_not_found", user_lang))
         return
 
     # Restore original notification with all buttons
-    notification_text = f"🔁 {reminder['message_text']}"
-    reply_markup = _build_recurring_notification_keyboard(reminder_id)
+    safe_text = escape_markdown(reminder['message_text'], version=1)
+    notification_text = f"🔁 {safe_text}"
+    reply_markup = build_notification_keyboard(reminder_id, is_recurring=True, language=user_lang)
 
     await query.edit_message_text(
         notification_text,

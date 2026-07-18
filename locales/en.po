@@ -24,7 +24,7 @@ msgstr "You're all set! 🎉\n\nUse the buttons below for quick access, or just 
 
 # Commands help
 msgid "help_message"
-msgstr "📖 *Kosmos Help*\n\n*Creating reminders:*\nSend a message with text and time:\n• `Reminder text tomorrow 16:00`\n• `Reminder text mon 10:00`\n• `Reminder text 14:30`\n\n*Recurring reminders:* 🔁\nUse /recurring to create reminders that repeat automatically:\n• Daily - Every day at the same time\n• Every X days - Repeat every N days\n• Weekly - Specific days (Mon, Wed, Fri...)\n• Monthly - On a specific day of the month\n\n*Supported time formats:*\n• Days: tomorrow, dat (day after tomorrow), mon/tue/wed/thu/fri/sat/sun\n• Next week: next mon/tue/wed/thu/fri/sat/sun\n• Time: 21:00, 8, 7am, 2100, etc.\n\n*Commands:*\n/list - View all upcoming reminders\n/recurring - Create recurring reminder\n/settings - Change language, time format, timezone\n/help - Show this help message\n\n*Quick actions:*\nUse the 'List' and 'Recurring' buttons below for quick access."
+msgstr "📖 *Kosmos Help*\n\n*Creating reminders:*\nSend a message with text and time:\n• `Reminder text tomorrow 16:00`\n• `Reminder text mon 10:00`\n• `Reminder text 14:30`\n\n*Recurring reminders:* 🔁\nUse /recurring to create reminders that repeat automatically:\n• Daily - Every day at the same time\n• Every X days - Repeat every N days\n• Weekly - Specific days (Mon, Wed, Fri...)\n• Monthly - On a specific day of the month\n\n*Supported time formats:*\n• Days: tomorrow, dat (day after tomorrow), mon/tue/wed/thu/fri/sat/sun\n• Next week: next mon/tue/wed/thu/fri/sat/sun\n• Time: 21:00, 8, 7am, 2100, etc.\n\n*Commands:*\n/list - View all upcoming reminders\n/quick - Quick reminder from your most used texts\n/recurring - Create recurring reminder\n/settings - Change language, time format, timezone\n/help - Show this help message\n\n*Quick actions:*\nUse the 'List', 'Quick' and 'Recurring' buttons below for quick access."
 
 msgid "new_reminder_prompt"
 msgstr "📝 To create a reminder, send me a message in this format:\n\n`[Your reminder text] [day] [time]`\n\n*Examples:*\n• Take fishing rod to the lake tomorrow 16:00\n• Meeting mon 10:00\n• Call next monday 9:00\n• Coffee 14:30"
@@ -177,3 +177,210 @@ msgstr "⏰ *{text}*\n\nWhen? Enter time (e.g. `sat 20:00`, `tomorrow 14:00`, `1
 
 msgid "quick_no_history"
 msgstr "You don't have enough reminder history for Quick access."
+
+# Recurring reminder deletion
+msgid "stop_recurring_button"
+msgstr "🗑️ Delete recurrence"
+
+msgid "stop_recurring_confirm"
+msgstr "🔁 *Recurring reminder*\n\nDo you want to permanently delete this recurring reminder?\n_{message_text}_"
+
+msgid "recurring_deleted"
+msgstr "✅ Recurring reminder deleted."
+
+msgid "delete_forever_button"
+msgstr "🗑️ Delete Forever"
+
+msgid "cancel_button"
+msgstr "❌ Cancel"
+
+msgid "reminder_not_found"
+msgstr "❌ Reminder not found."
+
+msgid "delete_error"
+msgstr "❌ Error deleting reminder."
+
+# Recurring reminder flow
+msgid "recurring_need_start"
+msgstr "Please start the bot first with /start"
+
+msgid "recurring_prompt_message"
+msgstr "📋 *Create recurring reminder*\n\nEnter reminder text:\n_/cancel to cancel_"
+
+msgid "recurring_empty_message"
+msgstr "Message cannot be empty. Try again:"
+
+msgid "recurring_choose_type"
+msgstr "✅ Reminder: *{message_text}*\n\nChoose recurrence type:"
+
+msgid "recurring_cancelled"
+msgstr "❌ Cancelled. Use /recurring to start again."
+
+msgid "rec_type_daily_button"
+msgstr "📅 Every day"
+
+msgid "rec_type_interval_button"
+msgstr "🔢 Every X days"
+
+msgid "rec_type_weekly_button"
+msgstr "📆 Days of week"
+
+msgid "rec_type_monthly_button"
+msgstr "📌 Monthly"
+
+msgid "rec_type_label_daily"
+msgstr "Every day"
+
+msgid "rec_type_label_interval"
+msgstr "Every X days"
+
+msgid "rec_type_label_weekly"
+msgstr "Days of week"
+
+msgid "rec_type_label_monthly"
+msgstr "Monthly"
+
+msgid "recurring_type_set"
+msgstr "✅ Type: *{type_label}*\n\n"
+
+msgid "recurring_time_prompt"
+msgstr "Enter time (e.g., 09:00, 14:30):\n_/cancel to cancel_"
+
+msgid "recurring_interval_prompt"
+msgstr "Enter number of days (e.g., 3 for every 3 days):\n_/cancel to cancel_"
+
+msgid "recurring_monthly_prompt"
+msgstr "Enter day of month (1-31):\n_/cancel to cancel_"
+
+msgid "recurring_select_days"
+msgstr "Select days (multiple allowed):"
+
+msgid "recurring_select_one_day"
+msgstr "Please select at least one day!"
+
+msgid "recurring_interval_invalid"
+msgstr "Number of days must be between 1 and 365. Try again:"
+
+msgid "recurring_day_invalid"
+msgstr "Day must be between 1 and 31. Try again:"
+
+msgid "recurring_invalid_number"
+msgstr "Please enter a valid number. Try again:"
+
+msgid "recurring_time_invalid"
+msgstr "❌ Invalid time format. Try again (e.g., 09:00, 14:30):"
+
+msgid "recurring_interval_set"
+msgstr "Every {days} days"
+
+msgid "recurring_monthday_set"
+msgstr "Day of month: {day}"
+
+msgid "recurring_days_set"
+msgstr "✅ Days: *{days}*\n\nEnter time (e.g., 09:00, 14:30):\n_/cancel to cancel_"
+
+msgid "recurring_duration_prompt"
+msgstr "For how many days should it repeat?"
+
+msgid "duration_forever_button"
+msgstr "♾️ Forever"
+
+msgid "duration_days_button"
+msgstr "{days} days"
+
+msgid "duration_custom_button"
+msgstr "📝 Enter number"
+
+msgid "recurring_duration_custom_prompt"
+msgstr "Enter number of days (1-365):\n_/cancel to cancel_"
+
+msgid "recurring_summary_title"
+msgstr "📋 *Recurring reminder overview*\n"
+
+msgid "recurring_summary_message"
+msgstr "💬 Message: {message}"
+
+msgid "recurring_summary_time"
+msgstr "🕐 Time: {time}"
+
+msgid "recurring_summary_recurrence"
+msgstr "🔁 Recurrence: {recurrence}"
+
+msgid "recurring_summary_duration"
+msgstr "⏳ Duration: {duration}"
+
+msgid "recurring_duration_forever"
+msgstr "Forever"
+
+msgid "recurring_duration_days"
+msgstr "{days} days"
+
+msgid "recurring_every_day"
+msgstr "Every day"
+
+msgid "recurring_every_x_days"
+msgstr "Every {days} days"
+
+msgid "recurring_monthly_desc"
+msgstr "on day {day} of the month"
+
+msgid "confirm_yes_button"
+msgstr "✅ Confirm"
+
+msgid "recurring_created"
+msgstr "✅ *Recurring reminder created!*\n\nNext reminder: {next_time}{end_info}"
+
+msgid "recurring_created_end_info"
+msgstr "\n⏳ Until: {end_date}"
+
+msgid "recurring_create_error"
+msgstr "❌ Error creating reminder. Try again."
+
+msgid "action_cancelled"
+msgstr "Cancelled"
+
+# Weekday names
+msgid "weekday_short_mon"
+msgstr "Mon"
+
+msgid "weekday_short_tue"
+msgstr "Tue"
+
+msgid "weekday_short_wed"
+msgstr "Wed"
+
+msgid "weekday_short_thu"
+msgstr "Thu"
+
+msgid "weekday_short_fri"
+msgstr "Fri"
+
+msgid "weekday_short_sat"
+msgstr "Sat"
+
+msgid "weekday_short_sun"
+msgstr "Sun"
+
+msgid "weekday_name_mon"
+msgstr "Monday"
+
+msgid "weekday_name_tue"
+msgstr "Tuesday"
+
+msgid "weekday_name_wed"
+msgstr "Wednesday"
+
+msgid "weekday_name_thu"
+msgstr "Thursday"
+
+msgid "weekday_name_fri"
+msgstr "Friday"
+
+msgid "weekday_name_sat"
+msgstr "Saturday"
+
+msgid "weekday_name_sun"
+msgstr "Sunday"
+
+msgid "done_button"
+msgstr "✅ Done"
