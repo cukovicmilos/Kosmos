@@ -65,6 +65,32 @@ def build_notification_keyboard(
     return InlineKeyboardMarkup(keyboard)
 
 
+def build_challenge_notification_keyboard(
+    reminder_id: int,
+    language: str = "en"
+) -> InlineKeyboardMarkup:
+    """
+    Build the inline keyboard for a challenge notification.
+    Challenges only have a delete button (no postpone - postponing a daily
+    challenge message makes no sense).
+
+    Args:
+        reminder_id: Reminder ID embedded in callback data
+        language: User's language for button labels
+
+    Returns:
+        InlineKeyboardMarkup with a single 'delete challenge' button
+    """
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                get_text("challenge_delete_button", language),
+                callback_data=f"stop_recurring_{reminder_id}"
+            ),
+        ]
+    ])
+
+
 def build_delete_recurring_confirm_keyboard(
     reminder_id: int,
     language: str = "en",

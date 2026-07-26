@@ -14,6 +14,7 @@ from database import get_user_reminders, delete_reminder, get_user, get_reminder
 from parsers.time_parser import format_datetime, parse_reminder, format_reminder_confirmation
 from i18n import get_text, WEEKDAY_SHORT_KEYS
 from keyboards import build_delete_recurring_confirm_keyboard
+from challenge_utils import challenge_elapsed_days
 from telegram.helpers import escape_markdown
 from telegram import ForceReply
 
@@ -141,9 +142,22 @@ def build_reminder_list_message(
             # Add to message
             separator = "u" if user_lang == "sr-lat" else "at"
 
-            # Check if recurring and add icon + description
+            # Check if challenge / recurring and add icon + description
+            is_challenge = reminder.get('is_challenge', 0)
             is_recurring = reminder.get('is_recurring', 0)
-            if is_recurring:
+            if is_challenge:
+                # Challenge: show 🎯 icon and progress counter (total/elapsed)
+                total_days = reminder.get('challenge_total_days') or 1
+                start_date = reminder.get('challenge_start_date')
+                if start_date:
+                    now = datetime.now(tz).replace(tzinfo=None)
+                    elapsed = challenge_elapsed_days(start_date, now)
+                    counter_info = f" ({total_days}/{min(elapsed, total_days)})"
+                else:
+                    counter_info = ""
+                recurring_icon = "🎯 "
+                recurrence_info = counter_info
+            elif is_recurring:
                 recurrence_desc = format_recurrence_description(reminder, user_lang)
                 recurring_icon = "🔁 "
                 recurrence_info = f" ({recurrence_desc})" if recurrence_desc else ""
@@ -268,12 +282,17 @@ async def delete_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_recurring = reminder.get('is_recurring', 0)
 
     if is_recurring:
-        # Show confirmation dialog for recurring reminders
+        # Show confirmation dialog for recurring reminders / challenges
         safe_text = escape_markdown(reminder['message_text'], version=1)
         reply_markup = build_delete_recurring_confirm_keyboard(reminder_id, user_lang)
 
+        if reminder.get('is_challenge', 0):
+            confirm_text = get_text("stop_challenge_confirm", user_lang, message_text=safe_text)
+        else:
+            confirm_text = get_text("stop_recurring_confirm", user_lang, message_text=safe_text)
+
         await query.edit_message_text(
-            get_text("stop_recurring_confirm", user_lang, message_text=safe_text),
+            confirm_text,
             parse_mode="Markdown",
             reply_markup=reply_markup
         )
@@ -348,12 +367,16 @@ async def delete_confirm_callback(update: Update, context: ContextTypes.DEFAULT_
     user = get_user(user_id)
     user_lang = user.get("language", "en") if user else "en"
 
+    # Check if it's a challenge for the appropriate confirmation message
+    reminder = get_reminder_by_id(reminder_id)
+    is_challenge = reminder.get('is_challenge', 0) if reminder else 0
+
     # Delete the recurring reminder
     success = delete_reminder(reminder_id)
 
     if success:
         await query.answer(
-            get_text("recurring_deleted", user_lang),
+            get_text("challenge_deleted" if is_challenge else "recurring_deleted", user_lang),
             show_alert=False
         )
 

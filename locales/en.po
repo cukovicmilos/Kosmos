@@ -24,7 +24,7 @@ msgstr "You're all set! 🎉\n\nUse the buttons below for quick access, or just 
 
 # Commands help
 msgid "help_message"
-msgstr "📖 *Kosmos Help*\n\n*Creating reminders:*\nSend a message with text and time:\n• `Reminder text tomorrow 16:00`\n• `Reminder text mon 10:00`\n• `Reminder text 14:30`\n\n*Recurring reminders:* 🔁\nUse /recurring to create reminders that repeat automatically:\n• Daily - Every day at the same time\n• Every X days - Repeat every N days\n• Weekly - Specific days (Mon, Wed, Fri...)\n• Monthly - On a specific day of the month\n\n*Supported time formats:*\n• Days: tomorrow, dat (day after tomorrow), mon/tue/wed/thu/fri/sat/sun\n• Next week: next mon/tue/wed/thu/fri/sat/sun\n• Time: 21:00, 8, 7am, 2100, etc.\n\n*Commands:*\n/list - View all upcoming reminders\n/quick - Quick reminder from your most used texts\n/recurring - Create recurring reminder\n/settings - Change language, time format, timezone\n/help - Show this help message\n\n*Quick actions:*\nUse the 'List', 'Quick' and 'Recurring' buttons below for quick access."
+msgstr "📖 *Kosmos Help*\n\n*Creating reminders:*\nSend a message with text and time:\n• `Reminder text tomorrow 16:00`\n• `Reminder text mon 10:00`\n• `Reminder text 14:30`\n\n*Recurring reminders:* 🔁\nUse /recurring to create reminders that repeat automatically:\n• Daily - Every day at the same time\n• Every X days - Repeat every N days\n• Weekly - Specific days (Mon, Wed, Fri...)\n• Monthly - On a specific day of the month\n\n*Challenges:* 🎯\nUse /challenge to create a daily challenge (e.g. 30 days without alcohol). Every day you'll get a message with a progress bar and day counter (total/elapsed).\n\n*Supported time formats:*\n• Days: tomorrow, dat (day after tomorrow), mon/tue/wed/thu/fri/sat/sun\n• Next week: next mon/tue/wed/thu/fri/sat/sun\n• Time: 21:00, 8, 7am, 2100, etc.\n\n*Commands:*\n/list - View all upcoming reminders\n/quick - Quick reminder from your most used texts\n/recurring - Create recurring reminder\n/challenge - Create a challenge with daily progress\n/settings - Change language, time format, timezone\n/help - Show this help message\n\n*Quick actions:*\nUse the 'List', 'Quick', 'Recurring' and 'Challenge' buttons below for quick access."
 
 msgid "new_reminder_prompt"
 msgstr "📝 To create a reminder, send me a message in this format:\n\n`[Your reminder text] [day] [time]`\n\n*Examples:*\n• Take fishing rod to the lake tomorrow 16:00\n• Meeting mon 10:00\n• Call next monday 9:00\n• Coffee 14:30"
@@ -384,3 +384,61 @@ msgstr "Sunday"
 
 msgid "done_button"
 msgstr "✅ Done"
+
+# Challenges
+msgid "challenge_prompt_name"
+msgstr "🎯 *Create a challenge*\n\nEnter the challenge name (e.g. No alcohol):\n_/cancel to cancel_"
+
+msgid "challenge_empty_name"
+msgstr "Name can't be empty. Try again:"
+
+msgid "challenge_name_too_long"
+msgstr "Name is too long (max 100 characters). Try again:"
+
+msgid "challenge_duration_prompt"
+msgstr "✅ Challenge: *{name}*\n\nHow many days does it last?"
+
+msgid "challenge_duration_days_button"
+msgstr "{days} days"
+
+msgid "challenge_duration_custom_button"
+msgstr "📝 Enter number"
+
+msgid "challenge_duration_custom_prompt"
+msgstr "Enter number of days (1-365):\n_/cancel to cancel_"
+
+msgid "challenge_time_prompt"
+msgstr "✅ Duration: *{days} days*\n\nEnter the time for the daily message (e.g. 09:00, 15:00):\n_/cancel to cancel_"
+
+msgid "challenge_summary_title"
+msgstr "🎯 *Challenge overview*\n"
+
+msgid "challenge_summary_name"
+msgstr "💬 Name: {name}"
+
+msgid "challenge_summary_duration"
+msgstr "⏳ Duration: {days} days"
+
+msgid "challenge_created"
+msgstr "✅ *Challenge created!*\n\nFirst message: {next_time}\n⏳ Last day: {end_date}\n📅 {total}/1"
+
+msgid "challenge_create_error"
+msgstr "❌ Error creating challenge. Please try again."
+
+msgid "challenge_cancelled"
+msgstr "❌ Cancelled. Use /challenge to start again."
+
+msgid "challenge_notification"
+msgstr "🎯 *{name}*\n\n{bar} {percent}%\n📅 {counter}"
+
+msgid "challenge_completed"
+msgstr "🎉 *Challenge completed: {name}*\n\n{bar} {percent}%\n📅 {counter}\n\nCongratulations! 🏆"
+
+msgid "challenge_delete_button"
+msgstr "🗑️ Delete challenge"
+
+msgid "challenge_deleted"
+msgstr "✅ Challenge deleted."
+
+msgid "stop_challenge_confirm"
+msgstr "🎯 *Challenge*\n\nDo you want to permanently delete this challenge?\n_{message_text}_"

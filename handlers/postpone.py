@@ -13,7 +13,8 @@ import pytz
 from database import get_reminder_by_id, update_reminder_time, get_user, create_reminder, delete_reminder
 from parsers.time_parser import parse_reminder, format_datetime, format_reminder_confirmation
 from i18n import get_text
-from keyboards import build_notification_keyboard, build_delete_recurring_confirm_keyboard
+from keyboards import build_notification_keyboard, build_delete_recurring_confirm_keyboard, build_challenge_notification_keyboard
+from challenge_utils import challenge_elapsed_days, build_challenge_message
 from telegram.helpers import escape_markdown
 
 logger = logging.getLogger(__name__)
@@ -271,8 +272,13 @@ async def stop_recurring_callback(update: Update, context: ContextTypes.DEFAULT_
     )
 
     safe_text = escape_markdown(reminder['message_text'], version=1)
+    if reminder.get('is_challenge', 0):
+        confirm_text = get_text("stop_challenge_confirm", user_lang, message_text=safe_text)
+    else:
+        confirm_text = get_text("stop_recurring_confirm", user_lang, message_text=safe_text)
+
     await query.edit_message_text(
-        get_text("stop_recurring_confirm", user_lang, message_text=safe_text),
+        confirm_text,
         parse_mode="Markdown",
         reply_markup=reply_markup
     )
@@ -294,7 +300,10 @@ async def stop_recurring_confirm_callback(update: Update, context: ContextTypes.
 
     success = delete_reminder(reminder_id)
     if success:
-        await query.edit_message_text(get_text("recurring_deleted", user_lang))
+        if reminder.get('is_challenge', 0):
+            await query.edit_message_text(get_text("challenge_deleted", user_lang))
+        else:
+            await query.edit_message_text(get_text("recurring_deleted", user_lang))
         logger.info(f"User {user_id} stopped recurring reminder {reminder_id} from notification")
     else:
         await query.edit_message_text(get_text("delete_error", user_lang))
@@ -314,7 +323,29 @@ async def stop_recurring_cancel_callback(update: Update, context: ContextTypes.D
         await query.edit_message_text(get_text("reminder_not_found", user_lang))
         return
 
-    # Restore original notification with all buttons
+    # Restore original notification with buttons
+    if reminder.get('is_challenge', 0):
+        # Restore challenge notification with current progress
+        user = get_user(user_id)
+        user_timezone = user.get("timezone", "Europe/Belgrade") if user else "Europe/Belgrade"
+        try:
+            tz = pytz.timezone(user_timezone)
+        except pytz.UnknownTimeZoneError:
+            tz = pytz.timezone("Europe/Belgrade")
+        now = datetime.now(tz).replace(tzinfo=None)
+
+        total_days = reminder.get('challenge_total_days') or 1
+        elapsed = challenge_elapsed_days(reminder.get('challenge_start_date') or now, now)
+        notification_text = build_challenge_message(reminder['message_text'], elapsed, total_days, user_lang)
+        reply_markup = build_challenge_notification_keyboard(reminder_id, user_lang)
+
+        await query.edit_message_text(
+            notification_text,
+            parse_mode="Markdown",
+            reply_markup=reply_markup
+        )
+        return
+
     safe_text = escape_markdown(reminder['message_text'], version=1)
     notification_text = f"🔁 {safe_text}"
     reply_markup = build_notification_keyboard(reminder_id, is_recurring=True, language=user_lang)

@@ -6,10 +6,11 @@
 
 - Create reminders with natural language time expressions
 - **🔁 Recurring reminders** - Daily, every X days, weekly (specific days), or monthly with optional duration
+- **🎯 Challenges** - Multi-day challenges (e.g. 30 days without alcohol) with daily progress bar and day counter
 - Multiple language support (English, Serbian)
 - Postpone reminders with quick actions (15m, 30m, 1h, 3h, 1d) or custom time
 - List and manage all your upcoming reminders
-- Persistent keyboard buttons for quick access (List, Recurring, Quick)
+- Persistent keyboard buttons for quick access (List, Recurring, Quick, Challenge)
 - Timezone support with accurate local time handling
 - Customizable time format (12h/24h)
 
@@ -52,6 +53,7 @@ After running `/start`, you'll see persistent buttons at the bottom of your chat
 - **📋 List** - View all your reminders
 - **🔁 Recurring** - Create a recurring reminder
 - **⚡ Quick** - Create a reminder from your most used texts
+- **🎯 Challenge** - Create a multi-day challenge with daily progress
 
 ### Postponing Reminders
 
@@ -64,6 +66,7 @@ When a reminder arrives, you can postpone it with:
 - `/start` - Initialize the bot and show keyboard buttons
 - `/list` - View all upcoming reminders
 - `/recurring` - Create a recurring reminder (daily, weekly, monthly, etc.)
+- `/challenge` - Create a challenge with daily progress tracking
 - `/quick` - Create a reminder from your most used texts
 - `/settings` - Configure language, time format, and timezone
 - `/help` - Get help and usage examples
@@ -82,6 +85,25 @@ Use `/recurring` command to create reminders that repeat automatically:
 **Deleting from Notification:** When a recurring reminder fires, you can delete it directly from the notification using the delete button.
 
 **Postponing:** When you postpone a recurring reminder, a new one-time reminder is created while the original continues on its schedule.
+
+### Challenges
+
+Use `/challenge` command (or the 🎯 button) to create a multi-day challenge, e.g. "30 days without alcohol":
+
+1. **Name** - The challenge name (e.g. `No alcohol`)
+2. **Duration** - 7, 14, 30 days or a custom number (1-365)
+3. **Time** - When the daily message arrives (e.g. `15:00`)
+
+Every day at the chosen time you'll receive a message with a progress bar and a day counter (`total/elapsed`):
+
+```
+🎯 No alcohol
+
+██░░░░░░░░ 17%
+📅 30/5
+```
+
+The counter starts from the creation date (creation day = day 1). On the last day you'll get a completion message 🎉 and the challenge ends automatically. Challenge notifications only have a delete button - challenges can also be managed from `/list`.
 
 ## Supported Time Formats
 

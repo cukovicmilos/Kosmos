@@ -105,6 +105,36 @@ def migrate_recurring_columns(cursor):
     logger.info("Recurring columns migration completed")
 
 
+def migrate_challenge_columns(cursor):
+    """
+    Migration function to add challenge columns to existing reminders table.
+    Checks if columns exist before adding them to prevent errors.
+    """
+    logger.info("Checking for challenge columns migration...")
+
+    cursor.execute("PRAGMA table_info(reminders)")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+
+    new_columns = {
+        'is_challenge': 'INTEGER DEFAULT 0',
+        'challenge_total_days': 'INTEGER',
+        'challenge_start_date': 'TIMESTAMP'
+    }
+
+    for column_name, column_def in new_columns.items():
+        if column_name not in existing_columns:
+            try:
+                cursor.execute(f"ALTER TABLE reminders ADD COLUMN {column_name} {column_def}")
+                logger.info(f"Added column '{column_name}' to reminders table")
+            except Exception as e:
+                logger.error(f"Error adding column '{column_name}': {e}")
+                raise
+        else:
+            logger.debug(f"Column '{column_name}' already exists, skipping")
+
+    logger.info("Challenge columns migration completed")
+
+
 def init_database():
     """
     Initialize database and create tables if they don't exist.
@@ -178,6 +208,9 @@ def init_database():
 
         # Run migrations for recurring reminders feature
         migrate_recurring_columns(cursor)
+
+        # Run migrations for challenges feature
+        migrate_challenge_columns(cursor)
 
         logger.info("Database initialized successfully")
 
@@ -340,7 +373,10 @@ def create_reminder(
     recurrence_interval: Optional[int] = None,
     recurrence_days: Optional[str] = None,
     recurrence_day_of_month: Optional[int] = None,
-    recurrence_end_date: Optional[datetime] = None
+    recurrence_end_date: Optional[datetime] = None,
+    is_challenge: bool = False,
+    challenge_total_days: Optional[int] = None,
+    challenge_start_date: Optional[datetime] = None
 ) -> Optional[int]:
     """
     Create a new reminder (one-time or recurring).
@@ -355,6 +391,9 @@ def create_reminder(
         recurrence_days: For 'weekly' type - JSON array of days (e.g., '["monday", "wednesday"]')
         recurrence_day_of_month: For 'monthly' type - day of month (1-31)
         recurrence_end_date: Optional end date for recurring reminders (None = forever)
+        is_challenge: Whether this is a challenge (daily recurring with progress counter)
+        challenge_total_days: For challenges - total number of days
+        challenge_start_date: For challenges - date the counter starts from
 
     Returns:
         Reminder ID if created successfully, None otherwise
@@ -366,18 +405,21 @@ def create_reminder(
                 INSERT INTO reminders (
                     user_id, message_text, scheduled_time, status,
                     is_recurring, recurrence_type, recurrence_interval,
-                    recurrence_days, recurrence_day_of_month, recurrence_end_date
+                    recurrence_days, recurrence_day_of_month, recurrence_end_date,
+                    is_challenge, challenge_total_days, challenge_start_date
                 )
-                VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 user_id, message_text, scheduled_time,
                 1 if is_recurring else 0, recurrence_type, recurrence_interval,
-                recurrence_days, recurrence_day_of_month, recurrence_end_date
+                recurrence_days, recurrence_day_of_month, recurrence_end_date,
+                1 if is_challenge else 0, challenge_total_days, challenge_start_date
             ))
 
             reminder_id = cursor.lastrowid
             recurring_info = f", recurring={recurrence_type}" if is_recurring else ""
-            logger.info(f"Reminder created: ID={reminder_id}, user={user_id}, time={scheduled_time}{recurring_info}")
+            challenge_info = f", challenge={challenge_total_days}d" if is_challenge else ""
+            logger.info(f"Reminder created: ID={reminder_id}, user={user_id}, time={scheduled_time}{recurring_info}{challenge_info}")
             return reminder_id
     except Exception as e:
         logger.error(f"Error creating reminder for user {user_id}: {e}")

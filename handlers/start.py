@@ -28,12 +28,12 @@ def get_main_keyboard(language: str = "en"):
     if language == "sr-lat":
         keyboard = [
             [KeyboardButton("🔁 Ponavljajući"), KeyboardButton("⚡ Brzi")],
-            [KeyboardButton("📋 Lista")],
+            [KeyboardButton("🎯 Izazov"), KeyboardButton("📋 Lista")],
         ]
     else:
         keyboard = [
             [KeyboardButton("🔁 Recurring"), KeyboardButton("⚡ Quick")],
-            [KeyboardButton("📋 List")],
+            [KeyboardButton("🎯 Challenge"), KeyboardButton("📋 List")],
         ]
 
     return ReplyKeyboardMarkup(

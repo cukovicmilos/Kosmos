@@ -7,6 +7,7 @@ import logging
 import json
 import calendar
 from datetime import datetime, timedelta
+import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from telegram import Bot
@@ -14,7 +15,8 @@ from telegram.error import NetworkError, TimedOut, TelegramError, BadRequest, Fo
 from telegram.helpers import escape_markdown
 
 from database import get_pending_reminders, update_reminder_status, update_reminder_time, parse_db_datetime
-from keyboards import build_notification_keyboard
+from keyboards import build_notification_keyboard, build_challenge_notification_keyboard
+from challenge_utils import challenge_elapsed_days, build_challenge_message
 from message_queue import process_pending_messages, cleanup_old_messages
 
 logger = logging.getLogger(__name__)
@@ -244,19 +246,36 @@ async def send_reminder(bot: Bot, reminder: dict):
 
     # Check if recurring (used for icon and delete button)
     is_recurring = reminder.get('is_recurring', 0)
+    is_challenge = reminder.get('is_challenge', 0)
 
-    # Escape user text for Markdown to prevent Telegram parse errors
-    # (unescaped _, *, [ etc. caused BadRequest and infinite pending retries)
-    safe_message_text = escape_markdown(message_text, version=1)
+    if is_challenge:
+        # Challenge notifications are rendered dynamically with progress bar
+        # and day counter (total/elapsed) based on the challenge start date
+        try:
+            tz = pytz.timezone(user_timezone)
+        except pytz.UnknownTimeZoneError:
+            tz = pytz.timezone('Europe/Belgrade')
+        now = datetime.now(tz).replace(tzinfo=None)
 
-    # Format reminder notification message (🔁 for recurring, 🔔 for one-time)
-    if is_recurring:
-        notification_text = f"🔁 {safe_message_text}"
+        total_days = reminder.get('challenge_total_days') or 1
+        start_date = reminder.get('challenge_start_date') or now
+        elapsed = challenge_elapsed_days(start_date, now)
+
+        notification_text = build_challenge_message(message_text, elapsed, total_days, user_lang)
+        reply_markup = build_challenge_notification_keyboard(reminder_id, user_lang)
     else:
-        notification_text = f"🔔 {safe_message_text}"
+        # Escape user text for Markdown to prevent Telegram parse errors
+        # (unescaped _, *, [ etc. caused BadRequest and infinite pending retries)
+        safe_message_text = escape_markdown(message_text, version=1)
 
-    # Create inline keyboard with postpone options (localized)
-    reply_markup = build_notification_keyboard(reminder_id, is_recurring, user_lang)
+        # Format reminder notification message (🔁 for recurring, 🔔 for one-time)
+        if is_recurring:
+            notification_text = f"🔁 {safe_message_text}"
+        else:
+            notification_text = f"🔔 {safe_message_text}"
+
+        # Create inline keyboard with postpone options (localized)
+        reply_markup = build_notification_keyboard(reminder_id, is_recurring, user_lang)
 
     try:
         # Send reminder message
@@ -273,7 +292,11 @@ async def send_reminder(bot: Bot, reminder: dict):
                 f"Markdown parse failed for reminder {reminder_id}, "
                 f"retrying without parse_mode: {markdown_error}"
             )
-            plain_text = f"🔁 {message_text}" if is_recurring else f"🔔 {message_text}"
+            if is_challenge:
+                # Challenge message only uses bold markers - strip them for plain text
+                plain_text = notification_text.replace("*", "")
+            else:
+                plain_text = f"🔁 {message_text}" if is_recurring else f"🔔 {message_text}"
             await bot.send_message(
                 chat_id=user_id,
                 text=plain_text,

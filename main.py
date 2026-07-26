@@ -19,7 +19,7 @@ from config import (
     TELEGRAM_POOL_TIMEOUT
 )
 from database import init_database
-from handlers import start, help as help_handler, reminder, postpone, list_handler, settings, recurring, quick
+from handlers import start, help as help_handler, reminder, postpone, list_handler, settings, recurring, quick, challenge
 from scheduler import start_scheduler
 
 # Try to import bot_stats for initial description update
@@ -45,6 +45,7 @@ async def post_init(application: Application) -> None:
         BotCommand("list", "View upcoming reminders"),
         BotCommand("quick", "Quick reminder from history"),
         BotCommand("recurring", "Create recurring reminder"),
+        BotCommand("challenge", "Create a challenge"),
         BotCommand("settings", "Change settings"),
     ]
     await application.bot.set_my_commands(commands)
@@ -94,6 +95,7 @@ def main():
     list_handler.register_handlers(application)  # List and delete commands
     settings.register_handlers(application)  # Settings command and callbacks
     recurring.register_handlers(application)  # Recurring reminder conversation
+    challenge.register_handlers(application)  # Challenge conversation
     quick.register_handlers(application)  # Quick reminder from history
     postpone.register_handlers(application)  # Register postpone callbacks
     reminder.register_handlers(application)  # Must be last (catches all text messages)

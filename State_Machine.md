@@ -290,6 +290,9 @@ Reminders are stored as naive datetime in the user's local timezone. When checki
 
 This ensures reminders fire at the correct time regardless of server timezone.
 
+**Challenge Rendering:**
+For reminders with `is_challenge=1`, the notification text is generated dynamically at send time (progress bar + `total/elapsed` counter based on `challenge_start_date` and current date in the user's timezone) instead of using the static `message_text`. Challenge notifications show only a delete button (no postpone options). Rescheduling and end-date handling are the same as for regular daily recurring reminders.
+
 ## 8. Postpone Reminder State Machine
 
 ```mermaid
@@ -374,35 +377,7 @@ Messages are retried with increasing delays to prevent API hammering:
 
 After 5 failed retries, messages are cleaned up during daily cleanup.
 
-## 10. Network Monitoring State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> NetworkOperation
-    NetworkOperation --> Success: Operation completed
-    NetworkOperation --> Timeout: Operation timed out
-
-    Success --> RecordSuccess: Update success counter
-    Timeout --> RecordTimeout: Log timeout event
-
-    RecordSuccess --> [*]: Stats updated
-    RecordTimeout --> [*]: Error logged
-
-    [*] --> GenerateReport: On /netstats command
-    GenerateReport --> DisplayStats: Show network statistics
-    DisplayStats --> [*]: Report shown
-```
-
-**States:**
-- **NetworkOperation**: Any network-dependent operation (send message, etc.)
-- **Success**: Operation completed without error
-- **Timeout**: Operation failed due to timeout
-- **RecordSuccess**: Increment success counter in database
-- **RecordTimeout**: Log timeout details for analysis
-- **GenerateReport**: User requests network statistics
-- **DisplayStats**: Show success/failure rates and recent issues
-
-## 11. Bot Statistics State Machine
+## 10. Bot Statistics State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -431,5 +406,52 @@ stateDiagram-v2
 - **QueryActiveUsers**: Count active users from database
 - **QueryStats**: Gather comprehensive bot usage statistics
 - **UpdateBotProfile**: Call Telegram API to update bot profile
-- **Error**: Handle API or database failures gracefully</content>
+- **Error**: Handle API or database failures gracefully
+
+## 11. Challenge Creation State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> NAME
+    NAME --> DURATION_CHOICE: Valid name (1-100 chars)
+    DURATION_CHOICE --> TIME_INPUT: 7 / 14 / 30 days selected
+    DURATION_CHOICE --> DURATION_INPUT: Custom selected
+    DURATION_CHOICE --> [*]: Cancel button
+    DURATION_INPUT --> TIME_INPUT: Valid days (1-365)
+    TIME_INPUT --> CONFIRM: Valid time parsed
+
+    CONFIRM --> [*]: Yes - create challenge
+    CONFIRM --> [*]: No - cancel
+
+    NAME --> NAME: Empty or too long name
+    DURATION_INPUT --> DURATION_INPUT: Invalid number
+    TIME_INPUT --> TIME_INPUT: Invalid time
+```
+
+**States:**
+- **NAME**: Waiting for challenge name input (max 100 chars)
+- **DURATION_CHOICE**: Select duration (7 / 14 / 30 days / custom) + cancel button
+- **DURATION_INPUT**: Input custom number of days (1-365)
+- **TIME_INPUT**: Input time of day for the daily challenge message
+- **CONFIRM**: Show summary (name, duration, time) and confirm creation
+
+**Data model:**
+A challenge is stored in the `reminders` table as a daily recurring reminder
+(`is_recurring=1`, `recurrence_type='daily'`) with additional columns:
+- **is_challenge**: Marks the reminder as a challenge
+- **challenge_total_days**: Total duration in days
+- **challenge_start_date**: Creation date - the counter starts here (creation day = day 1)
+- **recurrence_end_date**: Last day of the challenge (start_date + total_days - 1)
+
+**Daily execution:**
+The scheduler renders challenge notifications dynamically at send time
+(see section 7): elapsed days = days since `challenge_start_date` + 1.
+The message contains a 10-segment block progress bar, percentage and a
+`total/elapsed` counter. On the last day a completion message is sent and
+the challenge stops automatically (existing end-date logic).
+
+**Notification buttons:**
+Challenge notifications only have a "Delete challenge" button (no postpone),
+which reuses the stop-recurring callback flow with challenge-specific texts.
+```</content>
 <parameter name="filePath">/var/www/html/kosmos/State_Machine.md
