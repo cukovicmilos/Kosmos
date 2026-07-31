@@ -14,6 +14,7 @@ from database import create_reminder, get_user
 from parsers.time_parser import parse_reminder, format_datetime, format_reminder_confirmation
 from i18n import get_text
 from message_queue import queue_message
+from .start import get_main_keyboard
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,12 @@ async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_
 
             # Try to send confirmation immediately
             try:
-                await update.message.reply_text(confirmation_msg)
+                # Attach main keyboard so the persistent buttons self-heal
+                # if the Telegram client ever forgets them
+                await update.message.reply_text(
+                    confirmation_msg,
+                    reply_markup=get_main_keyboard(user_lang)
+                )
                 logger.info(
                     f"Reminder created: ID={reminder_id}, user={user_id}, "
                     f"time={scheduled_time}, text='{reminder_text}'"
