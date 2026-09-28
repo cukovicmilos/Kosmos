@@ -5,6 +5,7 @@
 ## Features
 
 - Create reminders with natural language time expressions
+- **2-in-1 reminders** — two times in one message (`Meds 21:00 6:00`, `Task tomorrow 20:00 wed 21:00`)
 - **🔁 Recurring reminders** - Daily, every X days, weekly (specific days), or monthly with optional duration
 - **🎯 Challenges** - Multi-day challenges (e.g. 30 days without alcohol) with daily progress bar and day counter
 - Multiple language support (English, Serbian)
@@ -39,6 +40,13 @@ Simply send a message with your reminder text and time:
 Take fishing rod to the lake tomorrow 16:00
 Meeting mon 10:00
 Coffee 14:30
+```
+
+Two times in one message create two reminders with the same text. A second time without a day is scheduled after the first, so an evening time plus an earlier clock time lands the next morning:
+
+```
+Meds 21:00 6:00
+Task tomorrow 20:00 wed 21:00
 ```
 
 You'll receive a confirmation showing when the reminder is scheduled:

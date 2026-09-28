@@ -36,9 +36,9 @@ stateDiagram-v2
 stateDiagram-v2
     [*] --> ReceiveMessage
     ReceiveMessage --> ValidateUser: Check user exists
-    ValidateUser --> ParseMessage: parse_reminder()
+    ValidateUser --> ParseMessage: parse_reminders()
     ParseMessage --> ValidateTime: Check not in past
-    ValidateTime --> CreateReminder: create_reminder()
+    ValidateTime --> CreateReminder: create_reminder() x1 or x2
     CreateReminder --> SendConfirmation: Success
     SendConfirmation --> [*]: Confirmation sent
 
@@ -56,10 +56,10 @@ stateDiagram-v2
 **States:**
 - **ReceiveMessage**: Text message received from user
 - **ValidateUser**: Verify user exists in database
-- **ParseMessage**: Extract reminder text and time using time parser
-- **ValidateTime**: Ensure scheduled time is in the future
-- **CreateReminder**: Store reminder in database
-- **SendConfirmation**: Send success message to user
+- **ParseMessage**: Extract reminder text and one or two times using time parser. Two time specs (`21:00 6:00`, `tomorrow 20:00 wed 21:00`) yield two reminders with the same text. A second time without a day is scheduled after the first.
+- **ValidateTime**: Ensure every scheduled time is in the future
+- **CreateReminder**: Store one or two reminders in the database
+- **SendConfirmation**: Send success message to user (one line per reminder)
 - **QueueConfirmation**: Queue confirmation for retry on network error
 
 ## 3. Recurring Reminder Creation State Machine
@@ -137,7 +137,7 @@ stateDiagram-v2
 1. User clicks "⚡ Quick"/"⚡ Brzi" keyboard button
 2. Bot queries last 100 sent non-recurring reminders, groups by LOWER(text), shows top 10
 3. User clicks a template → bot asks "Kada?"
-4. User enters time → bot combines template text + time input, uses `parse_reminder()` to create reminder
+4. User enters time → bot combines template text + time input, uses `parse_reminders()` to create one or two reminders (`21:00 6:00` creates both)
 5. Bot confirms with `format_reminder_confirmation()`
 
 ## 5. Settings Configuration State Machine

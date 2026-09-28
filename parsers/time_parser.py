@@ -12,12 +12,16 @@ Rules:
 2. If time has passed today, assume tomorrow
 3. Weekdays always mean next occurrence
 4. Dates without year assume current year (or next year if date has passed)
+5. Two time specs at the end create two reminders with the same text
+6. A second time without a day is scheduled after the first
+   (21:00 6:00 in the evening = tonight and tomorrow morning)
 """
 
 import re
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
+from dataclasses import dataclass
+from typing import List, Optional, Tuple
 import pytz
 
 logger = logging.getLogger(__name__)
@@ -388,6 +392,273 @@ def parse_reminder(message: str, user_timezone: str = "Europe/Belgrade") -> Opti
     logger.info(f"Parsed reminder: '{reminder_text}' at {scheduled_dt}")
 
     return (reminder_text.strip(), scheduled_dt_naive)
+
+
+@dataclass
+class TimeSpec:
+    hour: int
+    minute: int
+    tokens: int
+    unambiguous: bool
+    day_offset: int = 0
+    target_weekday: Optional[int] = None
+    target_date: Optional[datetime] = None
+    is_next_week: bool = False
+    has_explicit_day: bool = False
+
+
+def _is_ampm_pair(hour_word: str, period_word: str) -> bool:
+    return bool(re.fullmatch(r"\d{1,2}", hour_word.strip())) and period_word.strip().lower() in {"am", "pm"}
+
+
+def _time_token_unambiguous(token: str) -> bool:
+    lower = token.strip().lower()
+    if parse_time_string(lower) is None:
+        return False
+    if ":" in lower or lower.endswith("am") or lower.endswith("pm"):
+        return True
+    return bool(re.fullmatch(r"\d{4}", lower))
+
+
+def _day_prefixed_spec(
+    day_word: str,
+    parsed: Tuple[int, int],
+    tokens: int,
+    now: datetime,
+) -> Optional[TimeSpec]:
+    day_l = day_word.lower()
+    hour, minute = parsed
+    if day_l in DAY_KEYWORDS:
+        return TimeSpec(
+            hour=hour,
+            minute=minute,
+            tokens=tokens,
+            unambiguous=True,
+            day_offset=DAY_KEYWORDS[day_l],
+            has_explicit_day=True,
+        )
+    if day_l in WEEKDAY_KEYWORDS:
+        return TimeSpec(
+            hour=hour,
+            minute=minute,
+            tokens=tokens,
+            unambiguous=True,
+            target_weekday=WEEKDAY_KEYWORDS[day_l],
+            has_explicit_day=True,
+        )
+    parsed_date = parse_date_string(day_word, now)
+    if parsed_date:
+        return TimeSpec(
+            hour=hour,
+            minute=minute,
+            tokens=tokens,
+            unambiguous=True,
+            target_date=parsed_date,
+            has_explicit_day=True,
+        )
+    return None
+
+
+def _spec_of_length(words: List[str], length: int, now: datetime) -> Optional[TimeSpec]:
+    """Parse a time spec that consumes exactly `length` tokens at the end of words."""
+    if length < 1 or len(words) < length:
+        return None
+    chunk = words[-length:]
+
+    if length == 4:
+        prefix, day, hour_word, period = chunk
+        if prefix.lower() in NEXT_KEYWORDS and day.lower() in WEEKDAY_KEYWORDS and _is_ampm_pair(hour_word, period):
+            parsed = parse_time_string(f"{hour_word} {period}")
+            if parsed:
+                return TimeSpec(
+                    hour=parsed[0],
+                    minute=parsed[1],
+                    tokens=4,
+                    unambiguous=True,
+                    target_weekday=WEEKDAY_KEYWORDS[day.lower()],
+                    is_next_week=True,
+                    has_explicit_day=True,
+                )
+        return None
+
+    if length == 3:
+        first, second, third = chunk
+        first_l = first.lower()
+        second_l = second.lower()
+        if first_l in NEXT_KEYWORDS and second_l in WEEKDAY_KEYWORDS:
+            parsed = parse_time_string(third)
+            if parsed:
+                return TimeSpec(
+                    hour=parsed[0],
+                    minute=parsed[1],
+                    tokens=3,
+                    unambiguous=True,
+                    target_weekday=WEEKDAY_KEYWORDS[second_l],
+                    is_next_week=True,
+                    has_explicit_day=True,
+                )
+        if _is_ampm_pair(second, third):
+            parsed = parse_time_string(f"{second} {third}")
+            if parsed:
+                return _day_prefixed_spec(first, parsed, 3, now)
+        return None
+
+    if length == 2:
+        first, second = chunk
+        if _is_ampm_pair(first, second):
+            parsed = parse_time_string(f"{first} {second}")
+            if parsed:
+                return TimeSpec(
+                    hour=parsed[0],
+                    minute=parsed[1],
+                    tokens=2,
+                    unambiguous=True,
+                )
+        parsed = parse_time_string(second)
+        if parsed:
+            return _day_prefixed_spec(first, parsed, 2, now)
+        return None
+
+    token = chunk[0]
+    if re.match(r"^\d{1,2}\.\d{1,2}\.\d{4}\.\d{1,2}:\d{2}$", token):
+        combined = parse_date_string(token, now)
+        if combined:
+            return TimeSpec(
+                hour=combined.hour,
+                minute=combined.minute,
+                tokens=1,
+                unambiguous=True,
+                target_date=combined,
+                has_explicit_day=True,
+            )
+    parsed = parse_time_string(token)
+    if parsed:
+        return TimeSpec(
+            hour=parsed[0],
+            minute=parsed[1],
+            tokens=1,
+            unambiguous=_time_token_unambiguous(token),
+        )
+    return None
+
+
+def _is_bare_spec(spec: TimeSpec) -> bool:
+    return (
+        not spec.has_explicit_day
+        and spec.day_offset == 0
+        and spec.target_weekday is None
+        and spec.target_date is None
+    )
+
+
+def _resolve_time_spec(spec: TimeSpec, now: datetime, tz) -> datetime:
+    """Resolve a time spec to a timezone-aware datetime."""
+    hour, minute = spec.hour, spec.minute
+
+    if spec.target_date is not None:
+        scheduled = spec.target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if scheduled.tzinfo is None:
+            scheduled = tz.localize(scheduled)
+        return scheduled
+
+    if spec.target_weekday is not None:
+        scheduled = get_next_weekday(spec.target_weekday, now)
+        if spec.is_next_week:
+            scheduled += timedelta(days=7)
+        return scheduled.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+    scheduled = now + timedelta(days=spec.day_offset)
+    scheduled = scheduled.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if spec.day_offset == 0 and scheduled <= now:
+        scheduled += timedelta(days=1)
+    return scheduled
+
+
+def _parse_dual_reminders(
+    words: List[str],
+    now: datetime,
+    tz,
+) -> Optional[List[Tuple[str, datetime]]]:
+    best = None
+    for right_len in range(1, 5):
+        if len(words) < right_len + 2:
+            continue
+        right = _spec_of_length(words, right_len, now)
+        if not right:
+            continue
+        left_words = words[:-right_len]
+        for left_len in range(4, 0, -1):
+            if len(left_words) < left_len + 1:
+                continue
+            left = _spec_of_length(left_words, left_len, now)
+            if not left or not left.unambiguous:
+                continue
+            text = " ".join(left_words[:-left_len]).strip()
+            if not text:
+                continue
+            key = (left.tokens, left.tokens + right.tokens)
+            if best is None or key > best[0]:
+                best = (key, text, left, right)
+            break
+
+    if not best:
+        return None
+
+    _, text, left, right = best
+    first = _resolve_time_spec(left, now, tz).replace(tzinfo=None)
+    second = _resolve_time_spec(right, now, tz).replace(tzinfo=None)
+    if _is_bare_spec(right):
+        while second <= first:
+            second += timedelta(days=1)
+
+    logger.info(f"Parsed dual reminder: '{text}' at {first} and {second}")
+    return [(text, first), (text, second)]
+
+
+def parse_reminders(
+    message: str,
+    user_timezone: str = "Europe/Belgrade",
+    now: Optional[datetime] = None,
+) -> Optional[List[Tuple[str, datetime]]]:
+    """
+    Parse one or two reminders from a single message.
+
+    Two time specs at the end create two reminders with the same text.
+    A second time without a day is scheduled after the first.
+
+    Args:
+        message: User's message (e.g., "Škembići 21:00 6:00")
+        user_timezone: User's timezone
+        now: Optional current time override (timezone-aware or naive local)
+
+    Returns:
+        List of (reminder_text, scheduled_datetime) or None if parsing fails
+    """
+    message = message.strip()
+    if not message:
+        return None
+
+    try:
+        tz = pytz.timezone(user_timezone)
+    except pytz.UnknownTimeZoneError:
+        tz = pytz.timezone("Europe/Belgrade")
+
+    if now is None:
+        current = datetime.now(tz)
+    elif now.tzinfo is None:
+        current = tz.localize(now)
+    else:
+        current = now.astimezone(tz)
+
+    words = message.split()
+    dual = _parse_dual_reminders(words, current, tz)
+    if dual:
+        return dual
+
+    single = parse_reminder(message, user_timezone)
+    if single:
+        return [single]
+    return None
 
 
 def format_datetime(dt: datetime, language: str = "en", time_format: str = "24h") -> str:

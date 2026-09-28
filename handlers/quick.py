@@ -16,9 +16,9 @@ from telegram.ext import (
     filters
 )
 
-from database import create_reminder, get_user, get_frequent_reminder_texts
+from database import create_reminder, delete_reminder, get_user, get_frequent_reminder_texts
 from i18n import get_text
-from parsers.time_parser import parse_reminder, format_reminder_confirmation
+from parsers.time_parser import parse_reminders, format_reminder_confirmation
 
 logger = logging.getLogger(__name__)
 
@@ -115,16 +115,14 @@ async def time_entered(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Combine reminder text with time input for parsing
     combined = f"{quick_text} {time_input}"
-    result = parse_reminder(combined, user_timezone)
+    results = parse_reminders(combined, user_timezone)
 
-    if not result:
+    if not results:
         await update.message.reply_text(
             get_text("quick_when", user_lang, text=quick_text),
             parse_mode="Markdown"
         )
         return ENTERING_TIME
-
-    reminder_text, scheduled_time = result
 
     # Validate not in the past
     try:
@@ -133,30 +131,37 @@ async def time_entered(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tz = pytz.timezone("Europe/Belgrade")
     now = datetime.now(tz).replace(tzinfo=None)
 
-    if scheduled_time <= now:
+    if any(scheduled_time <= now for _, scheduled_time in results):
         await update.message.reply_text(
             get_text("reminder_in_past", user_lang)
         )
         return ENTERING_TIME
 
-    # Create reminder
-    reminder_id = create_reminder(
-        user_id=user_id,
-        message_text=reminder_text,
-        scheduled_time=scheduled_time
-    )
+    created_ids = []
+    for reminder_text, scheduled_time in results:
+        reminder_id = create_reminder(
+            user_id=user_id,
+            message_text=reminder_text,
+            scheduled_time=scheduled_time
+        )
+        if not reminder_id:
+            for old_id in created_ids:
+                delete_reminder(old_id)
+            await update.message.reply_text(get_text("error_occurred", user_lang))
+            context.user_data.pop('quick_text', None)
+            context.user_data.pop('quick_templates', None)
+            return ConversationHandler.END
+        created_ids.append(reminder_id)
 
-    if reminder_id:
-        confirmation_msg = format_reminder_confirmation(
-            reminder_text, scheduled_time, user_time_format, now=now
-        )
-        await update.message.reply_text(confirmation_msg)
-        logger.info(
-            f"Quick reminder created: ID={reminder_id}, user={user_id}, "
-            f"time={scheduled_time}, text='{reminder_text}'"
-        )
-    else:
-        await update.message.reply_text(get_text("error_occurred", user_lang))
+    confirmation_msg = "\n".join(
+        format_reminder_confirmation(text, scheduled, user_time_format, now=now)
+        for text, scheduled in results
+    )
+    await update.message.reply_text(confirmation_msg)
+    logger.info(
+        f"Quick reminders created: IDs={created_ids}, user={user_id}, "
+        f"times={[scheduled for _, scheduled in results]}, text='{results[0][0]}'"
+    )
 
     # Clean up
     context.user_data.pop('quick_text', None)

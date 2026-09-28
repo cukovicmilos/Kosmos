@@ -10,8 +10,8 @@ from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 from telegram.error import NetworkError, TimedOut
 
-from database import create_reminder, get_user
-from parsers.time_parser import parse_reminder, format_datetime, format_reminder_confirmation
+from database import create_reminder, delete_reminder, get_user
+from parsers.time_parser import parse_reminders, format_datetime, format_reminder_confirmation
 from i18n import get_text
 from message_queue import queue_message
 from .start import get_main_keyboard
@@ -24,10 +24,13 @@ async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_
     Handle regular text messages and try to parse them as reminders.
 
     Expected format: [reminder text] [day] [time]
+    Two times create two reminders: [text] [time] [time]
     Examples:
     - "Kafa sutra 14:00"
     - "Meeting mon 10:00"
     - "Call John 18:30"
+    - "Škembići 21:00 6:00"
+    - "Task tomorrow 20:00 wed 21:00"
     """
     # Guard clauses for None checks
     if not update.effective_user:
@@ -59,11 +62,11 @@ async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_
     user_timezone = user.get("timezone", "Europe/Belgrade")
     user_time_format = user.get("time_format", "24h")
 
-    # Try to parse the message as a reminder
+    # Try to parse the message as one or two reminders
     try:
-        result = parse_reminder(message_text, user_timezone)
+        results = parse_reminders(message_text, user_timezone)
 
-        if not result:
+        if not results:
             # Parsing failed - show error message with examples
             await update.message.reply_text(
                 get_text("reminder_parse_error", user_lang),
@@ -72,71 +75,69 @@ async def handle_reminder_message(update: Update, context: ContextTypes.DEFAULT_
             logger.info(f"Failed to parse reminder from user {user_id}: '{message_text}'")
             return
 
-        reminder_text, scheduled_time = result
-
-        # Validate that scheduled time is not in the past (using user's timezone)
+        # Validate that scheduled times are not in the past (using user's timezone)
         try:
             tz = pytz.timezone(user_timezone)
         except pytz.UnknownTimeZoneError:
             tz = pytz.timezone("Europe/Belgrade")
         now = datetime.now(tz).replace(tzinfo=None)  # Naive datetime in user's timezone
-        if scheduled_time <= now:
+        if any(scheduled_time <= now for _, scheduled_time in results):
             await update.message.reply_text(
                 get_text("reminder_in_past", user_lang)
             )
-            logger.info(f"User {user_id} tried to create reminder in the past: {scheduled_time}")
+            logger.info(f"User {user_id} tried to create reminder in the past: {results}")
             return
 
-        # Create reminder in database
-        reminder_id = create_reminder(
-            user_id=user_id,
-            message_text=reminder_text,
-            scheduled_time=scheduled_time
+        created_ids = []
+        for reminder_text, scheduled_time in results:
+            reminder_id = create_reminder(
+                user_id=user_id,
+                message_text=reminder_text,
+                scheduled_time=scheduled_time
+            )
+            if not reminder_id:
+                for old_id in created_ids:
+                    delete_reminder(old_id)
+                try:
+                    await update.message.reply_text(
+                        get_text("error_occurred", user_lang)
+                    )
+                except Exception as reply_error:
+                    logger.error(f"Failed to send database error message to user {user_id}: {reply_error}")
+                logger.error(f"Failed to create reminder in database for user {user_id}")
+                return
+            created_ids.append(reminder_id)
+
+        confirmation_msg = "\n".join(
+            format_reminder_confirmation(text, scheduled, user_time_format, now=now)
+            for text, scheduled in results
         )
 
-        if reminder_id:
-            # Success - prepare confirmation message using helper function
-            confirmation_msg = format_reminder_confirmation(
-                reminder_text, scheduled_time, user_time_format, now=now
+        try:
+            # Attach main keyboard so the persistent buttons self-heal
+            # if the Telegram client ever forgets them
+            await update.message.reply_text(
+                confirmation_msg,
+                reply_markup=get_main_keyboard(user_lang)
             )
-
-            # Try to send confirmation immediately
-            try:
-                # Attach main keyboard so the persistent buttons self-heal
-                # if the Telegram client ever forgets them
-                await update.message.reply_text(
-                    confirmation_msg,
-                    reply_markup=get_main_keyboard(user_lang)
-                )
-                logger.info(
-                    f"Reminder created: ID={reminder_id}, user={user_id}, "
-                    f"time={scheduled_time}, text='{reminder_text}'"
-                )
-            except (NetworkError, TimedOut) as e:
-                # Network error - queue the confirmation for retry
-                logger.warning(f"Network error sending confirmation to user {user_id}, queuing for retry: {e}")
-                queue_message(user_id, confirmation_msg, message_type='reminder_confirmation')
-                logger.info(
-                    f"Reminder created and confirmation queued: ID={reminder_id}, user={user_id}, "
-                    f"time={scheduled_time}, text='{reminder_text}'"
-                )
-            except Exception as e:
-                # Other error - still queue for retry
-                logger.error(f"Error sending confirmation to user {user_id}, queuing for retry: {e}")
-                queue_message(user_id, confirmation_msg, message_type='reminder_confirmation')
-                logger.info(
-                    f"Reminder created and confirmation queued: ID={reminder_id}, user={user_id}, "
-                    f"time={scheduled_time}, text='{reminder_text}'"
-                )
-        else:
-            # Database error
-            try:
-                await update.message.reply_text(
-                    get_text("error_occurred", user_lang)
-                )
-            except Exception as reply_error:
-                logger.error(f"Failed to send database error message to user {user_id}: {reply_error}")
-            logger.error(f"Failed to create reminder in database for user {user_id}")
+            logger.info(
+                f"Reminders created: IDs={created_ids}, user={user_id}, "
+                f"times={[scheduled for _, scheduled in results]}, text='{results[0][0]}'"
+            )
+        except (NetworkError, TimedOut) as e:
+            logger.warning(f"Network error sending confirmation to user {user_id}, queuing for retry: {e}")
+            queue_message(user_id, confirmation_msg, message_type='reminder_confirmation')
+            logger.info(
+                f"Reminders created and confirmation queued: IDs={created_ids}, user={user_id}, "
+                f"times={[scheduled for _, scheduled in results]}, text='{results[0][0]}'"
+            )
+        except Exception as e:
+            logger.error(f"Error sending confirmation to user {user_id}, queuing for retry: {e}")
+            queue_message(user_id, confirmation_msg, message_type='reminder_confirmation')
+            logger.info(
+                f"Reminders created and confirmation queued: IDs={created_ids}, user={user_id}, "
+                f"times={[scheduled for _, scheduled in results]}, text='{results[0][0]}'"
+            )
 
     except Exception as e:
         logger.error(f"Error handling reminder message from user {user_id}: {e}", exc_info=True)

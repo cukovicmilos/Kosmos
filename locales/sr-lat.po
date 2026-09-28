@@ -8,7 +8,7 @@ msgstr ""
 
 # Welcome and start messages
 msgid "welcome_message"
-msgstr "Dobrodošao u Kosmos! 🚀\n\nJa sam tvoj lični podsetnik. Pomažu ti da zapamtiš važne stvari.\n\nDa kreiraš podsetnik, samo mi pošalji poruku kao:\n• Kafa sutra 14:00\n• Sastanak pon 10:00\n• Pozovi Jovana 18:30\n\nKoristi /help da vidiš sve dostupne komande."
+msgstr "Dobrodošao u Kosmos! 🚀\n\nJa sam tvoj lični podsetnik. Pomažu ti da zapamtiš važne stvari.\n\nDa kreiraš podsetnik, samo mi pošalji poruku kao:\n• Kafa sutra 14:00\n• Sastanak pon 10:00\n• Pozovi Jovana 18:30\n• Lekovi 21:00 6:00 (dva podsetnika)\n\nKoristi /help da vidiš sve dostupne komande."
 
 msgid "welcome_back"
 msgstr "Dobrodošao nazad! 👋"
@@ -24,17 +24,17 @@ msgstr "Sve je spremno! 🎉\n\nKoristi dugmad ispod za brzi pristup, ili mi sam
 
 # Commands help
 msgid "help_message"
-msgstr "📖 *Kosmos Pomoć*\n\n*Kreiranje podsetnika:*\nPošalji poruku sa tekstom i vremenom:\n• `Tekst podsetnika sutra 16:00`\n• `Tekst podsetnika pon 10:00`\n• `Tekst podsetnika 14:30`\n\n*Ponavljajući podsetnoci:* 🔁\nKoristi /recurring da kreiraš podsetnike koji se automatski ponavljaju:\n• Svaki dan - Svakog dana u isto vreme\n• Svaki X dan - Ponavlja se svakih N dana\n• Nedeljno - Određeni dani (Pon, Sre, Pet...)\n• Mesečno - Određeni dan u mesecu\n\n*Izazovi:* 🎯\nKoristi /challenge da kreiraš dnevni izazov (npr. 30 dana bez alkohola). Svaki dan dobijaš poruku sa progress barom i brojačem dana (ukupno/proteklo).\n\n*Podržani formati vremena:*\n• Dani: sutra, prekosutra, pon/uto/sre/cet/pet/sub/ned\n• Sledeća nedelja: sl pon/uto/sre/cet/pet/sub/ned\n• Vreme: 21:00, 8, 7am, 2100, itd.\n\n*Komande:*\n/list - Prikaži sve podsetnike u budućnosti\n/quick - Brzi podsetnik iz najčešćih tekstova\n/recurring - Kreiraj ponavljajući podsetnik\n/challenge - Kreiraj izazov sa dnevnim progresom\n/settings - Promeni jezik, format vremena, vremensku zonu\n/help - Prikaži ovu pomoć\n\n*Brze akcije:*\nKoristi dugmad 'Lista', 'Brzi', 'Ponavljajući' i 'Izazov' ispod za brzi pristup."
+msgstr "📖 *Kosmos Pomoć*\n\n*Kreiranje podsetnika:*\nPošalji poruku sa tekstom i vremenom:\n• `Tekst podsetnika sutra 16:00`\n• `Tekst podsetnika pon 10:00`\n• `Tekst podsetnika 14:30`\n\n*Dva podsetnika u jednoj poruci:*\n• `Lekovi 21:00 6:00` — večeras i sledeće jutro\n• `Zadatak sutra 20:00 sre 21:00`\nDrugo vreme bez dana ide posle prvog.\n\n*Ponavljajući podsetnoci:* 🔁\nKoristi /recurring da kreiraš podsetnike koji se automatski ponavljaju:\n• Svaki dan - Svakog dana u isto vreme\n• Svaki X dan - Ponavlja se svakih N dana\n• Nedeljno - Određeni dani (Pon, Sre, Pet...)\n• Mesečno - Određeni dan u mesecu\n\n*Izazovi:* 🎯\nKoristi /challenge da kreiraš dnevni izazov (npr. 30 dana bez alkohola). Svaki dan dobijaš poruku sa progress barom i brojačem dana (ukupno/proteklo).\n\n*Podržani formati vremena:*\n• Dani: sutra, prekosutra, pon/uto/sre/cet/pet/sub/ned\n• Sledeća nedelja: sl pon/uto/sre/cet/pet/sub/ned\n• Vreme: 21:00, 8, 7am, 2100, itd.\n\n*Komande:*\n/list - Prikaži sve podsetnike u budućnosti\n/quick - Brzi podsetnik iz najčešćih tekstova\n/recurring - Kreiraj ponavljajući podsetnik\n/challenge - Kreiraj izazov sa dnevnim progresom\n/settings - Promeni jezik, format vremena, vremensku zonu\n/help - Prikaži ovu pomoć\n\n*Brze akcije:*\nKoristi dugmad 'Lista', 'Brzi', 'Ponavljajući' i 'Izazov' ispod za brzi pristup."
 
 msgid "new_reminder_prompt"
-msgstr "📝 Da kreiraš podsetnik, pošalji mi poruku u ovom formatu:\n\n`[Tvoj tekst podsetnika] [dan] [vreme]`\n\n*Primeri:*\n• Ponesi pecaljku na jezero sutra 16:00\n• Sastanak pon 10:00\n• Poziv sl pon 9:00\n• Kafa 14:30"
+msgstr "📝 Da kreiraš podsetnik, pošalji mi poruku u ovom formatu:\n\n`[Tvoj tekst podsetnika] [dan] [vreme]`\n\n*Primeri:*\n• Ponesi pecaljku na jezero sutra 16:00\n• Sastanak pon 10:00\n• Poziv sl pon 9:00\n• Kafa 14:30\n• Lekovi 21:00 6:00 (dva podsetnika)\n• Zadatak sutra 20:00 sre 21:00"
 
 # Reminder creation
 msgid "reminder_created"
 msgstr "Zabeleženo ✓"
 
 msgid "reminder_parse_error"
-msgstr "Nisam razumeo format vremena. Pokušaj ponovo:\n\n`[Poruka] [dan] [vreme]`\n\n*Primeri:*\n• Ponesi pecaljku sutra 16:00\n• Sastanak pon 10:00\n• Sastanak sl cet 10:00\n• Kafa 14:30"
+msgstr "Nisam razumeo format vremena. Pokušaj ponovo:\n\n`[Poruka] [dan] [vreme]`\n\n*Primeri:*\n• Ponesi pecaljku sutra 16:00\n• Sastanak pon 10:00\n• Sastanak sl cet 10:00\n• Kafa 14:30\n• Lekovi 21:00 6:00"
 
 # Reminder notifications
 msgid "reminder_notification"
@@ -173,7 +173,7 @@ msgid "quick_title"
 msgstr "⚡ *Tvoji najčešći podsetnici:*"
 
 msgid "quick_when"
-msgstr "⏰ *{text}*\n\nKada? Upiši vreme (npr. `sub 20:00`, `sutra 14:00`, `18:30`)"
+msgstr "⏰ *{text}*\n\nKada? Upiši vreme (npr. `sub 20:00`, `sutra 14:00`, `18:30`, `21:00 6:00`)"
 
 msgid "quick_no_history"
 msgstr "Nemaš dovoljno podsetnika u istoriji za Quick pristup."
