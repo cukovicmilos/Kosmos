@@ -124,6 +124,7 @@ stateDiagram-v2
     SELECTING_TEMPLATE --> ENTERING_TIME: Template selected (quick_select_{index})
     ENTERING_TIME --> [*]: Valid time → reminder created
     ENTERING_TIME --> ENTERING_TIME: Invalid time → re-prompt
+    ENTERING_TIME --> ENTERING_TIME: Calendar date picked (cal_quick_{y}_{m}_{d}) → time-only prompt
 
     SELECTING_TEMPLATE --> [*]: No history → show message
     [*] --> [*]: /cancel command
@@ -131,13 +132,13 @@ stateDiagram-v2
 
 **States:**
 - **SELECTING_TEMPLATE** (0): Inline keyboard with top 10 frequent reminder texts displayed, waiting for user selection
-- **ENTERING_TIME** (1): User selected a template, waiting for time input (e.g., "sub 20:00", "sutra 14:00")
+- **ENTERING_TIME** (1): User selected a template, waiting for time input (e.g., "sub 20:00", "sutra 14:00"). The prompt message carries an inline calendar (see §12) — the user may click a date (`cal_quick_...`) and then only type the time, or keep typing the whole time expression as before.
 
 **Flow:**
 1. User clicks "⚡ Quick"/"⚡ Brzi" keyboard button
 2. Bot queries last 100 sent non-recurring reminders, groups by LOWER(text), shows top 10
-3. User clicks a template → bot asks "Kada?"
-4. User enters time → bot combines template text + time input, uses `parse_reminders()` to create one or two reminders (`21:00 6:00` creates both)
+3. User clicks a template → bot asks "Kada?" with the inline calendar attached
+4. User enters time (optionally after picking a date from the calendar) → bot combines template text + date + time input, uses `parse_reminders()` to create one or two reminders (`21:00 6:00` creates both)
 5. Bot confirms with `format_reminder_confirmation()`
 
 ## 5. Settings Configuration State Machine
@@ -304,6 +305,8 @@ stateDiagram-v2
 
     PostponeClicked --> CustomTimePrompt: "Drugo vreme" clicked
     CustomTimePrompt --> ParseCustomTime: User input received
+    CustomTimePrompt --> CalendarDatePicked: Date picked from calendar (cal_postpone_{y}_{m}_{d})
+    CalendarDatePicked --> ParseCustomTime: User input received (time only)
     ParseCustomTime --> UpdateTime: Valid time parsed
     ParseCustomTime --> CustomTimePrompt: Invalid time
 
@@ -314,8 +317,9 @@ stateDiagram-v2
 - **PostponeClicked**: User clicks postpone button in reminder notification
 - **CalculateDelay**: Parse button callback data (15m, 30m, 1h, 3h, 1d)
 - **UpdateTime**: Update reminder's scheduled time in database
-- **CustomTimePrompt**: Show input field for custom postpone time
-- **ParseCustomTime**: Parse user's custom time input
+- **CustomTimePrompt**: Show input field for custom postpone time, with the inline calendar attached (see §12) — typing the time stays the parallel path
+- **CalendarDatePicked**: User picked a date from the calendar; bot asks only for the time
+- **ParseCustomTime**: Parse user's custom time input (combined with the calendar date if one was picked)
 
 ### 8.1 Stop Recurring from Notification
 
@@ -453,5 +457,34 @@ the challenge stops automatically (existing end-date logic).
 **Notification buttons:**
 Challenge notifications only have a "Delete challenge" button (no postpone),
 which reuses the stop-recurring callback flow with challenge-specific texts.
+
+## 12. Calendar Date Picker (Shared Component)
+
+```mermaid
+stateDiagram-v2
+    [*] --> CalendarShown: Flow reaches its "when?" step
+    CalendarShown --> CalendarShown: ◀▶ month navigation (calnav_* → re-render via editMessageText)
+    CalendarShown --> CalendarShown: Dead button (caldead → "Past date" toast / calnoop → silent)
+    CalendarShown --> DatePicked: Day clicked (cal_{flow}_{y}_{m}_{d})
+    DatePicked --> TimeEntered: Bot asks only for the time
+    TimeEntered --> [*]: Valid time → reminder created
+    TimeEntered --> TimeEntered: Invalid/past time → re-prompt
+    CalendarShown --> [*]: ❌ Cancel (calcancel_{flow})
+```
+
+**Implementation:** `handlers/calendar_ui.py` — shared, stateless builder + callback patterns. Telegram has no native date picker, so this renders the standard inline-keyboard calendar: month grid with ◀▶ navigation via `callback_data`, re-rendered in place with `editMessageReplyMarkup`. Past days are dead buttons; today is marked `[18]` and still clickable; navigation is clamped to the current month + 12.
+
+**Callback data formats** (under Telegram's 64-byte limit):
+- `cal_{flow}_{y}_{m}_{d}` — day selected
+- `calnav_{flow}_{y}_{m}` — month navigation
+- `calcancel_{flow}` — cancel
+- `caldead` / `calnoop` — dead buttons (past days / decoration)
+
+**Flows using the picker** (`flow` in callback data routes the click to the right conversation):
+1. **new** → `/kalendar` command or 📅 keyboard button (`handlers/calendar.py`): states ENTERING_TEXT → SHOWING_CALENDAR → WAITING_TIME. Flow: "Šta?" (text) → calendar (date) → time → confirmation.
+2. **quick** → Quick reminder (`handlers/quick.py`): calendar attached to the ENTERING_TIME prompt; picked date is stored in `quick_cal_date`, then only the time is typed.
+3. **postpone** → "Drugo vreme" on a delivered reminder (`handlers/postpone.py`): calendar attached to the custom-time prompt; picked date is stored in `postpone_cal_date`, then only the time is typed.
+
+**Principle:** typing remains the parallel path in all three flows — the picked date and typed time are combined into one string (`"{text} {d}.{m}. {time}"`) and parsed by the existing `parse_reminders()` / `parse_reminder()`, so all validations (past time, dual times) apply unchanged.
 ```</content>
 <parameter name="filePath">/var/www/html/kosmos/State_Machine.md

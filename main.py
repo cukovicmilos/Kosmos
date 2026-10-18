@@ -20,6 +20,7 @@ from config import (
 )
 from database import init_database
 from handlers import start, help as help_handler, reminder, postpone, list_handler, settings, recurring, quick, challenge
+from handlers import calendar as calendar_handler
 from scheduler import start_scheduler
 
 # Try to import bot_stats for initial description update
@@ -43,6 +44,7 @@ async def post_init(application: Application) -> None:
         BotCommand("start", "Start the bot"),
         BotCommand("help", "Show help message"),
         BotCommand("list", "View upcoming reminders"),
+        BotCommand("kalendar", "Create reminder with the calendar picker"),
         BotCommand("quick", "Quick reminder from history"),
         BotCommand("recurring", "Create recurring reminder"),
         BotCommand("challenge", "Create a challenge"),
@@ -97,6 +99,7 @@ def main():
     recurring.register_handlers(application)  # Recurring reminder conversation
     challenge.register_handlers(application)  # Challenge conversation
     quick.register_handlers(application)  # Quick reminder from history
+    calendar_handler.register_handlers(application)  # /kalendar calendar picker conversation
     postpone.register_handlers(application)  # Register postpone callbacks
     reminder.register_handlers(application)  # Must be last (catches all text messages)
 

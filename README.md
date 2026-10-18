@@ -9,9 +9,10 @@
 - **🔁 Recurring reminders** - Daily, every X days, weekly (specific days), or monthly with optional duration
 - **🎯 Challenges** - Multi-day challenges (e.g. 30 days without alcohol) with daily progress bar and day counter
 - Multiple language support (English, Serbian)
+- **📅 Calendar date picker** - pick a date from an inline calendar in the /kalendar flow, Quick reminders and postpone "Custom time"
 - Postpone reminders with quick actions (15m, 30m, 1h, 3h, 1d) or custom time
 - List and manage all your upcoming reminders
-- Persistent keyboard buttons for quick access (List, Recurring, Quick, Challenge)
+- Persistent keyboard buttons for quick access (List, Recurring, Quick, Challenge, Kalendar)
 - Timezone support with accurate local time handling
 - Customizable time format (12h/24h)
 
@@ -62,17 +63,29 @@ After running `/start`, you'll see persistent buttons at the bottom of your chat
 - **🔁 Recurring** - Create a recurring reminder
 - **⚡ Quick** - Create a reminder from your most used texts
 - **🎯 Challenge** - Create a multi-day challenge with daily progress
+- **📅 Kalendar** - Create a reminder with the calendar picker
+
+### Calendar Picker 📅
+
+Telegram has no native calendar, so the bot shows an inline-keyboard calendar (day grid with ◀▶ month navigation). Past days are disabled. After picking a date, you only enter the time.
+
+It is available at three places — always as an **option next to typing, never a replacement** (if you prefer typing "prekosutra 8", just keep typing):
+
+1. **/kalendar** (or the 📅 button): *What?* (text) → calendar (date) → time → confirmation
+2. **Quick reminder**: after choosing a template, the "When?" message shows the calendar — click a date and type the time, or type everything as before
+3. **Postpone → Custom time**: the "Drugo vreme" button opens the calendar instead of a bare text prompt — pick a date, then type the time (or just type the time directly)
 
 ### Postponing Reminders
 
 When a reminder arrives, you can postpone it with:
 - Quick actions: 15 min, 30 min, 1h, 3h, 1 day
-- Custom time: Choose "Drugo vreme" / "Custom time" and enter specific time (e.g., `19:00` or `tue 14:00`)
+- Custom time: Choose "Drugo vreme" / "Custom time" and enter specific time (e.g., `19:00` or `tue 14:00`) — or pick a date from the calendar and type the time
 
 ### Commands
 
 - `/start` - Initialize the bot and show keyboard buttons
 - `/list` - View all upcoming reminders
+- `/kalendar` - Create a reminder with the 📅 calendar picker
 - `/recurring` - Create a recurring reminder (daily, weekly, monthly, etc.)
 - `/challenge` - Create a challenge with daily progress tracking
 - `/quick` - Create a reminder from your most used texts

@@ -29,11 +29,13 @@ def get_main_keyboard(language: str = "en"):
         keyboard = [
             [KeyboardButton("🔁 Ponavljajući"), KeyboardButton("⚡ Brzi")],
             [KeyboardButton("🎯 Izazov"), KeyboardButton("📋 Lista")],
+            [KeyboardButton("📅 Kalendar")],
         ]
     else:
         keyboard = [
             [KeyboardButton("🔁 Recurring"), KeyboardButton("⚡ Quick")],
             [KeyboardButton("🎯 Challenge"), KeyboardButton("📋 List")],
+            [KeyboardButton("📅 Kalendar")],
         ]
 
     return ReplyKeyboardMarkup(
