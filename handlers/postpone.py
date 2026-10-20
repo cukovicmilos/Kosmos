@@ -4,7 +4,7 @@ Handles postponing reminders when user clicks postpone buttons.
 """
 
 import logging
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler, ConversationHandler, MessageHandler, filters
 from telegram.error import TelegramError
@@ -16,18 +16,6 @@ from i18n import get_text
 from keyboards import build_notification_keyboard, build_delete_recurring_confirm_keyboard, build_challenge_notification_keyboard
 from challenge_utils import challenge_elapsed_days, build_challenge_message
 from telegram.helpers import escape_markdown
-from .calendar_ui import (
-    build_calendar_markup,
-    format_date_display,
-    parse_date_callback,
-    parse_nav_callback,
-    nav_in_range,
-    DATE_PATTERN,
-    NAV_PATTERN,
-    CANCEL_PATTERN,
-    DEAD_PATTERN,
-    NOOP_PATTERN,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -83,13 +71,9 @@ async def postpone_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if duration == "custom":
         # Store reminder_id in user_data for the conversation handler
         context.user_data['postpone_reminder_id'] = reminder_id
-        context.user_data.pop('postpone_cal_date', None)
 
-        # Custom time opens the calendar instead of a bare text prompt -
-        # typing the time stays the parallel path
         await query.edit_message_text(
-            get_text("custom_time_prompt", user_lang),
-            reply_markup=build_calendar_markup("postpone", user_lang, user_timezone)
+            get_text("custom_time_prompt", user_lang)
         )
         return WAITING_CUSTOM_TIME
 
@@ -192,31 +176,17 @@ async def custom_time_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Parse the time input
     # We need to add some dummy text since the parser expects "text time" format
     # User is only providing the time part
-    cal_date = context.user_data.get('postpone_cal_date')
-    if cal_date:
-        # Date was picked from the calendar, only the time is typed
-        selected_date = date(*cal_date)
-        dummy_message = f"reminder {selected_date.day}.{selected_date.month}. {time_input}"
-        date_display = format_date_display(selected_date, user_lang)
-    else:
-        dummy_message = f"reminder {time_input}"
-        date_display = ""
+    dummy_message = f"reminder {time_input}"
 
     try:
         result = parse_reminder(dummy_message, user_timezone)
 
         if not result:
             # Parsing failed
-            if cal_date:
-                await update.message.reply_text(
-                    get_text("calendar_time_prompt", user_lang, date=date_display),
-                    parse_mode="Markdown"
-                )
-            else:
-                await update.message.reply_text(
-                    get_text("custom_time_parse_error", user_lang),
-                    parse_mode="Markdown"
-                )
+            await update.message.reply_text(
+                get_text("custom_time_parse_error", user_lang),
+                parse_mode="Markdown"
+            )
             return WAITING_CUSTOM_TIME
 
         _, new_time = result
@@ -263,7 +233,6 @@ async def custom_time_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # Clear user_data
     context.user_data.pop('postpone_reminder_id', None)
-    context.user_data.pop('postpone_cal_date', None)
     return ConversationHandler.END
 
 
@@ -272,89 +241,6 @@ async def cancel_custom_time(update: Update, context: ContextTypes.DEFAULT_TYPE)
     Cancel custom time input conversation.
     """
     context.user_data.pop('postpone_reminder_id', None)
-    context.user_data.pop('postpone_cal_date', None)
-    return ConversationHandler.END
-
-
-async def calendar_date_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle date selection from the inline calendar - ask only for the time."""
-    query = update.callback_query
-    parsed = parse_date_callback(query.data)
-    if not parsed or parsed[0] != "postpone":
-        await query.answer()
-        return WAITING_CUSTOM_TIME
-
-    if not context.user_data.get('postpone_reminder_id'):
-        await query.answer()
-        return ConversationHandler.END
-
-    _, selected_date = parsed
-    await query.answer()
-
-    user_id = update.effective_user.id
-    user = get_user(user_id)
-    user_lang = user.get('language', 'en') if user else 'en'
-
-    context.user_data['postpone_cal_date'] = (selected_date.year, selected_date.month, selected_date.day)
-
-    await query.edit_message_text(
-        get_text("calendar_time_prompt", user_lang, date=format_date_display(selected_date, user_lang)),
-        parse_mode="Markdown"
-    )
-    return WAITING_CUSTOM_TIME
-
-
-async def calendar_nav(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle ◀▶ month navigation - re-render the calendar in place."""
-    query = update.callback_query
-    parsed = parse_nav_callback(query.data)
-    if not parsed or parsed[0] != "postpone":
-        await query.answer()
-        return WAITING_CUSTOM_TIME
-
-    _, year, month = parsed
-
-    user_id = update.effective_user.id
-    user = get_user(user_id)
-    user_lang = user.get('language', 'en') if user else 'en'
-    user_timezone = user.get('timezone', 'Europe/Belgrade') if user else 'Europe/Belgrade'
-
-    if not nav_in_range(year, month, user_timezone):
-        await query.answer()
-        return WAITING_CUSTOM_TIME
-
-    await query.answer()
-    await query.edit_message_reply_markup(
-        reply_markup=build_calendar_markup("postpone", user_lang, user_timezone, year, month)
-    )
-    return WAITING_CUSTOM_TIME
-
-
-async def calendar_dead(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Toast for dead buttons (past days)."""
-    query = update.callback_query
-    user = get_user(update.effective_user.id)
-    user_lang = user.get('language', 'en') if user else 'en'
-    await query.answer(text=get_text("calendar_dead", user_lang), show_alert=False)
-    return WAITING_CUSTOM_TIME
-
-
-async def calendar_noop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Silently acknowledge decoration buttons (header, weekdays, padding)."""
-    await update.callback_query.answer()
-    return WAITING_CUSTOM_TIME
-
-
-async def calendar_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Cancel the custom postpone flow via the inline calendar cancel button."""
-    await update.callback_query.answer()
-    user = get_user(update.effective_user.id)
-    user_lang = user.get('language', 'en') if user else 'en'
-
-    context.user_data.pop('postpone_reminder_id', None)
-    context.user_data.pop('postpone_cal_date', None)
-
-    await update.callback_query.edit_message_text(get_text("calendar_cancelled", user_lang))
     return ConversationHandler.END
 
 
@@ -490,11 +376,6 @@ def register_handlers(application):
         states={
             WAITING_CUSTOM_TIME: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, custom_time_message),
-                CallbackQueryHandler(calendar_date_selected, pattern=DATE_PATTERN),
-                CallbackQueryHandler(calendar_nav, pattern=NAV_PATTERN),
-                CallbackQueryHandler(calendar_cancel, pattern=CANCEL_PATTERN),
-                CallbackQueryHandler(calendar_dead, pattern=DEAD_PATTERN),
-                CallbackQueryHandler(calendar_noop, pattern=NOOP_PATTERN),
             ]
         },
         fallbacks=[

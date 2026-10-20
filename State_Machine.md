@@ -305,8 +305,6 @@ stateDiagram-v2
 
     PostponeClicked --> CustomTimePrompt: "Drugo vreme" clicked
     CustomTimePrompt --> ParseCustomTime: User input received
-    CustomTimePrompt --> CalendarDatePicked: Date picked from calendar (cal_postpone_{y}_{m}_{d})
-    CalendarDatePicked --> ParseCustomTime: User input received (time only)
     ParseCustomTime --> UpdateTime: Valid time parsed
     ParseCustomTime --> CustomTimePrompt: Invalid time
 
@@ -317,9 +315,8 @@ stateDiagram-v2
 - **PostponeClicked**: User clicks postpone button in reminder notification
 - **CalculateDelay**: Parse button callback data (15m, 30m, 1h, 3h, 1d)
 - **UpdateTime**: Update reminder's scheduled time in database
-- **CustomTimePrompt**: Show input field for custom postpone time, with the inline calendar attached (see §12) — typing the time stays the parallel path
-- **CalendarDatePicked**: User picked a date from the calendar; bot asks only for the time
-- **ParseCustomTime**: Parse user's custom time input (combined with the calendar date if one was picked)
+- **CustomTimePrompt**: Show plain input prompt for the custom postpone time (no calendar — the reminder has already fired, so a bare text prompt is enough)
+- **ParseCustomTime**: Parse user's custom time input
 
 ### 8.1 Stop Recurring from Notification
 
@@ -483,8 +480,9 @@ stateDiagram-v2
 **Flows using the picker** (`flow` in callback data routes the click to the right conversation):
 1. **new** → `/kalendar` command or 📅 keyboard button (`handlers/calendar.py`): states ENTERING_TEXT → SHOWING_CALENDAR → WAITING_TIME. Flow: "Šta?" (text) → calendar (date) → time → confirmation.
 2. **quick** → Quick reminder (`handlers/quick.py`): calendar attached to the ENTERING_TIME prompt; picked date is stored in `quick_cal_date`, then only the time is typed.
-3. **postpone** → "Drugo vreme" on a delivered reminder (`handlers/postpone.py`): calendar attached to the custom-time prompt; picked date is stored in `postpone_cal_date`, then only the time is typed.
 
-**Principle:** typing remains the parallel path in all three flows — the picked date and typed time are combined into one string (`"{text} {d}.{m}. {time}"`) and parsed by the existing `parse_reminders()` / `parse_reminder()`, so all validations (past time, dual times) apply unchanged.
+(Postpone "Custom time" intentionally does **not** attach the calendar — the reminder has already fired, so a bare text prompt suffices, see §8.)
+
+**Principle:** typing remains the parallel path in both flows — the picked date and typed time are combined into one string (`"{text} {d}.{m}. {time}"`) and parsed by the existing `parse_reminders()` / `parse_reminder()`, so all validations (past time, dual times) apply unchanged.
 ```</content>
 <parameter name="filePath">/var/www/html/kosmos/State_Machine.md

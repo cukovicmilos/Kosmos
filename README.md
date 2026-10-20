@@ -9,7 +9,7 @@
 - **🔁 Recurring reminders** - Daily, every X days, weekly (specific days), or monthly with optional duration
 - **🎯 Challenges** - Multi-day challenges (e.g. 30 days without alcohol) with daily progress bar and day counter
 - Multiple language support (English, Serbian)
-- **📅 Calendar date picker** - pick a date from an inline calendar in the /kalendar flow, Quick reminders and postpone "Custom time"
+- **📅 Calendar date picker** - pick a date from an inline calendar in the /kalendar flow and Quick reminders
 - Postpone reminders with quick actions (15m, 30m, 1h, 3h, 1d) or custom time
 - List and manage all your upcoming reminders
 - Persistent keyboard buttons for quick access (List, Recurring, Quick, Challenge, Kalendar)
@@ -73,13 +73,12 @@ It is available at three places — always as an **option next to typing, never 
 
 1. **/kalendar** (or the 📅 button): *What?* (text) → calendar (date) → time → confirmation
 2. **Quick reminder**: after choosing a template, the "When?" message shows the calendar — click a date and type the time, or type everything as before
-3. **Postpone → Custom time**: the "Drugo vreme" button opens the calendar instead of a bare text prompt — pick a date, then type the time (or just type the time directly)
 
 ### Postponing Reminders
 
 When a reminder arrives, you can postpone it with:
 - Quick actions: 15 min, 30 min, 1h, 3h, 1 day
-- Custom time: Choose "Drugo vreme" / "Custom time" and enter specific time (e.g., `19:00` or `tue 14:00`) — or pick a date from the calendar and type the time
+- Custom time: Choose "Drugo vreme" / "Custom time" and enter specific time (e.g., `19:00` or `tue 14:00`)
 
 ### Commands
 

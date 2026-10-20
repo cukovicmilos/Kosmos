@@ -8,10 +8,12 @@ callback_data, re-rendered in place with editMessageText.
 Past days are dead buttons (caldead callback -> toast, no action).
 After a date is picked, the flow only needs to ask for the time.
 
-Shared by three flows (typing a time stays the parallel path everywhere):
+Shared by two flows (typing a time stays the parallel path everywhere):
   - new      -> /kalendar flow (handlers/calendar.py)
   - quick    -> Quick reminder (handlers/quick.py)
-  - postpone -> "Custom time" on a delivered reminder (handlers/postpone.py)
+
+(Postpone "Custom time" does not use the picker - the reminder has already
+fired, so a bare text prompt is enough.)
 
 Callback data formats (kept well under Telegram's 64-byte limit):
   cal_{flow}_{y}_{m}_{d}   - a day was clicked
@@ -34,7 +36,7 @@ from i18n import get_text
 
 logger = logging.getLogger(__name__)
 
-FLOWS = ("new", "quick", "postpone")
+FLOWS = ("new", "quick")
 
 # Regex patterns for CallbackQueryHandler registration
 DATE_PATTERN = rf"^cal_({'|'.join(FLOWS)})_(\d{{4}})_(\d{{1,2}})_(\d{{1,2}})$"
@@ -81,7 +83,7 @@ def build_calendar_markup(
     Build the inline calendar keyboard for a month.
 
     Args:
-        flow: Which flow is picking a date ('new', 'quick' or 'postpone'),
+        flow: Which flow is picking a date ('new' or 'quick'),
               embedded in callback_data so the right conversation handles it
         language: User's language for month/weekday/cancel labels
         timezone: User's timezone (defines which days are 'past')
