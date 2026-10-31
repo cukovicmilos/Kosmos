@@ -247,10 +247,21 @@ stateDiagram-v2
     CheckPending --> [*]: No reminders
 
     SendReminder --> NetworkSuccess: Message sent
-    SendReminder --> NetworkError: Timeout/Failure
+    SendReminder --> NetworkError: Timeout/Failure/Other error
+    SendReminder --> PermanentError: BadRequest (e.g. chat not found)
+    SendReminder --> Blocked: Forbidden (user blocked bot)
 
     NetworkSuccess --> CheckRecurring: Reminder sent
-    NetworkError --> [*]: Retry next cycle
+    NetworkError --> CountAttempt: Increment retry_count
+    CountAttempt --> [*]: retry_count below REMINDER_MAX_RETRIES (retry next cycle)
+    CountAttempt --> GiveUp: retry_count reached REMINDER_MAX_RETRIES
+    PermanentError --> GiveUp
+    Blocked --> [*]: Status 'cancelled', no notification
+
+    GiveUp --> SkipOccurrence: Recurring reminder
+    GiveUp --> MarkFailed: One-time reminder
+    SkipOccurrence --> [*]: Next occurrence scheduled, user notified
+    MarkFailed --> [*]: Status 'failed', user notified
 
     CheckRecurring --> RescheduleRecurring: Is recurring
     CheckRecurring --> MarkSent: One-time reminder
@@ -268,7 +279,13 @@ stateDiagram-v2
 - **CheckPending**: Query database for due reminders (every minute)
 - **SendReminder**: Send notification to user with postpone options
 - **NetworkSuccess**: Message delivered successfully
-- **NetworkError**: Network timeout or delivery failure
+- **NetworkError**: Network timeout, delivery failure or unexpected error. Counted in `reminders.retry_count`
+- **CountAttempt**: Increment `retry_count` (one attempt per scheduler run, every minute)
+- **PermanentError**: Telegram rejected the request (`BadRequest`); retrying cannot succeed, so give up at once
+- **Blocked**: User blocked the bot; reminder is cancelled
+- **GiveUp**: Stop retrying and send the user a plain-text "could not deliver" notification (best-effort)
+- **SkipOccurrence**: Recurring reminder skips the undelivered occurrence and keeps its schedule
+- **MarkFailed**: One-time reminder gets status `failed` and is no longer retried
 - **CheckRecurring**: Determine if reminder is recurring or one-time
 - **RescheduleRecurring**: Handle recurring reminder rescheduling
 - **CalculateNext**: Compute next occurrence based on recurrence pattern
@@ -290,6 +307,9 @@ Reminders are stored as naive datetime in the user's local timezone. When checki
 4. Only include reminders where scheduled_time <= now (in user's TZ)
 
 This ensures reminders fire at the correct time regardless of server timezone.
+
+**Retry Limit:**
+Failed sends increment `reminders.retry_count`. When it reaches `REMINDER_MAX_RETRIES` (default 120, env-configurable, roughly two hours at one attempt per minute) the reminder gives up as described above. `retry_count` is reset to 0 whenever the scheduled time changes (postpone, edit time, recurring reschedule), so each new occurrence gets a fresh budget.
 
 **Challenge Rendering:**
 For reminders with `is_challenge=1`, the notification text is generated dynamically at send time (progress bar + `total/elapsed` counter based on `challenge_start_date` and current date in the user's timezone) instead of using the static `message_text`. Challenge notifications show only a delete button (no postpone options). Rescheduling and end-date handling are the same as for regular daily recurring reminders.
@@ -486,3 +506,27 @@ stateDiagram-v2
 **Principle:** typing remains the parallel path in both flows — the picked date and typed time are combined into one string (`"{text} {d}.{m}. {time}"`) and parsed by the existing `parse_reminders()` / `parse_reminder()`, so all validations (past time, dual times) apply unchanged.
 ```</content>
 <parameter name="filePath">/var/www/html/kosmos/State_Machine.md
+## 13. Admin Alert State Machine
+
+Alerts go to `ADMIN_CHAT_ID` (optional, `.env`). Polling failures are counted in `alerts.py`; the periodic `check_polling_health` job announces recovery.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Healthy
+    Healthy --> Streak: Polling failure (NetworkError/TimedOut, update=None)
+    Streak --> Streak: Failure within STREAK_GAP (120s)
+    Streak --> Streak: Failure after gap (streak restarts at 1)
+    Streak --> Alerted: Streak >= MAX_CONSECUTIVE_TIMEOUTS, admin message delivered
+    Streak --> Streak: Admin message failed (retry on next failure)
+    Alerted --> Alerted: More failures (no new alert)
+    Alerted --> Healthy: No failures for RECOVERY_QUIET (300s), recovery message delivered
+    Healthy --> [*]
+```
+
+**States:**
+- **Healthy**: No active outage
+- **Streak**: Consecutive polling failures counted, not yet alerted
+- **Alerted**: Admin was told about the outage; one alert per outage
+- **Startup notice**: `post_init` in `main.py` sends a single "bot started" message on every start (not a state, sent once)
+
+Other errors (handler exceptions, BadRequest) are not counted; they are logged by the same error handler, because registering one disables PTB's default logging.

@@ -72,8 +72,12 @@ TELEGRAM_READ_TIMEOUT = float(os.getenv("TELEGRAM_READ_TIMEOUT", "30.0"))  # Rea
 TELEGRAM_WRITE_TIMEOUT = float(os.getenv("TELEGRAM_WRITE_TIMEOUT", "30.0"))  # Write timeout
 TELEGRAM_POOL_TIMEOUT = float(os.getenv("TELEGRAM_POOL_TIMEOUT", "10.0"))  # Pool timeout
 
-# Monitoring configuration
-MAX_CONSECUTIVE_TIMEOUTS = int(os.getenv("MAX_CONSECUTIVE_TIMEOUTS", "3"))  # Alert threshold
+# Admin alerts: Telegram chat that receives bot health messages (optional)
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "0")) or None
+MAX_CONSECUTIVE_TIMEOUTS = int(os.getenv("MAX_CONSECUTIVE_TIMEOUTS", "3"))  # Consecutive polling failures before alert
+
+# Reminder delivery: failed send attempts before giving up (scheduler retries once per minute)
+REMINDER_MAX_RETRIES = int(os.getenv("REMINDER_MAX_RETRIES", "120"))
 
 
 def setup_logging():

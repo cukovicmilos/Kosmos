@@ -168,6 +168,12 @@ msgstr "Podsetnik nije pronađen ili je već obrisan."
 msgid "reminder_in_past"
 msgstr "Ne mogu da kreiram podsetnik u prošlosti. Izaberi datum i vreme u budućnosti."
 
+msgid "reminder_delivery_failed"
+msgstr "⚠️ Nisam uspeo da dostavim ovaj podsetnik ni posle više pokušaja, pa nije poslat:\n\n{text}"
+
+msgid "reminder_delivery_failed_recurring"
+msgstr "⚠️ Nisam uspeo da dostavim ovo ponavljanje podsetnika, pa je preskočeno:\n\n{text}"
+
 # Quick reminders
 msgid "quick_title"
 msgstr "⚡ *Tvoji najčešći podsetnici:*"

@@ -168,6 +168,12 @@ msgstr "Reminder not found or already deleted."
 msgid "reminder_in_past"
 msgstr "Cannot create a reminder in the past. Please choose a future date and time."
 
+msgid "reminder_delivery_failed"
+msgstr "⚠️ I couldn't deliver this reminder after several attempts, so it was not sent:\n\n{text}"
+
+msgid "reminder_delivery_failed_recurring"
+msgstr "⚠️ I couldn't deliver this occurrence of your recurring reminder, so it was skipped:\n\n{text}"
+
 # Quick reminders
 msgid "quick_title"
 msgstr "⚡ *Your most frequent reminders:*"

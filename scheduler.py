@@ -14,7 +14,16 @@ from telegram import Bot
 from telegram.error import NetworkError, TimedOut, TelegramError, BadRequest, Forbidden
 from telegram.helpers import escape_markdown
 
-from database import get_pending_reminders, update_reminder_status, update_reminder_time, parse_db_datetime
+from alerts import check_polling_health
+from config import REMINDER_MAX_RETRIES
+from database import (
+    get_pending_reminders,
+    update_reminder_status,
+    update_reminder_time,
+    increment_reminder_retry,
+    parse_db_datetime,
+)
+from i18n import get_text
 from keyboards import build_notification_keyboard, build_challenge_notification_keyboard
 from challenge_utils import challenge_elapsed_days, build_challenge_message
 from message_queue import process_pending_messages, cleanup_old_messages
@@ -228,6 +237,83 @@ async def check_and_send_reminders(bot: Bot):
         logger.error(f"Error in check_and_send_reminders: {e}", exc_info=True)
 
 
+def _advance_reminder(reminder: dict):
+    """
+    Move a reminder past its current occurrence: reschedule recurring ones,
+    close one-time ones (or recurring ones that reached their end date).
+    """
+    reminder_id = reminder['id']
+
+    if not reminder.get('is_recurring', 0):
+        update_reminder_status(reminder_id, 'sent')
+        logger.info(f"One-time reminder {reminder_id} marked as sent")
+        return
+
+    next_time = calculate_next_occurrence(reminder)
+
+    end_date_str = reminder.get('recurrence_end_date')
+    if end_date_str:
+        try:
+            end_date = parse_db_datetime(end_date_str)
+        except (ValueError, AttributeError):
+            end_date = None
+
+        if end_date and next_time > end_date:
+            update_reminder_status(reminder_id, 'sent')
+            logger.info(f"Recurring reminder {reminder_id} completed - end date {end_date} reached")
+            return
+
+    update_reminder_time(reminder_id, next_time)
+    logger.info(f"Recurring reminder {reminder_id} rescheduled to {next_time}")
+
+
+async def _give_up_on_reminder(bot: Bot, reminder: dict, reason: str):
+    """
+    Stop retrying a reminder that cannot be delivered and tell the user.
+
+    One-time reminders are marked 'failed'. Recurring ones skip this occurrence
+    and keep their schedule. The notification is best-effort: if the network is
+    still down it will fail too, and that is only logged.
+    """
+    reminder_id = reminder['id']
+    user_id = reminder['user_id']
+    user_lang = reminder.get('language', 'en')
+
+    if reminder.get('is_recurring', 0):
+        _advance_reminder(reminder)
+        msgid = "reminder_delivery_failed_recurring"
+    else:
+        update_reminder_status(reminder_id, 'failed')
+        msgid = "reminder_delivery_failed"
+
+    logger.error(f"Giving up on reminder {reminder_id} for user {user_id}: {reason}")
+
+    try:
+        await bot.send_message(
+            chat_id=user_id,
+            text=get_text(msgid, user_lang, text=reminder['message_text'])
+        )
+    except Exception as e:
+        logger.warning(f"Could not notify user {user_id} about undelivered reminder {reminder_id}: {e}")
+
+
+async def _record_failed_attempt(bot: Bot, reminder: dict, error: Exception):
+    """
+    Count a failed send attempt and give up once the retry limit is reached.
+    The scheduler runs every minute, so the limit is roughly a number of minutes.
+    """
+    reminder_id = reminder['id']
+    attempts = increment_reminder_retry(reminder_id)
+
+    if attempts >= REMINDER_MAX_RETRIES:
+        await _give_up_on_reminder(bot, reminder, f"{attempts} failed attempts, last error: {error}")
+    else:
+        logger.warning(
+            f"Reminder {reminder_id} not delivered (attempt {attempts}/{REMINDER_MAX_RETRIES}), "
+            f"will retry: {error}"
+        )
+
+
 async def send_reminder(bot: Bot, reminder: dict):
     """
     Send a reminder to the user with postpone options.
@@ -303,34 +389,6 @@ async def send_reminder(bot: Bot, reminder: dict):
                 reply_markup=reply_markup
             )
 
-        if is_recurring:
-            # Calculate next occurrence and reschedule
-            next_time = calculate_next_occurrence(reminder)
-
-            # Check if recurring period has expired (end_date set)
-            end_date_str = reminder.get('recurrence_end_date')
-            if end_date_str:
-                try:
-                    end_date = parse_db_datetime(end_date_str)
-                except (ValueError, AttributeError):
-                    end_date = None
-
-                if end_date and next_time > end_date:
-                    update_reminder_status(reminder_id, 'sent')
-                    logger.info(f"Recurring reminder {reminder_id} completed - end date {end_date} reached")
-                else:
-                    update_reminder_time(reminder_id, next_time)
-                    logger.info(f"Recurring reminder {reminder_id} rescheduled to {next_time}")
-            else:
-                update_reminder_time(reminder_id, next_time)
-                logger.info(f"Recurring reminder {reminder_id} rescheduled to {next_time}")
-        else:
-            # Mark one-time reminder as sent
-            update_reminder_status(reminder_id, 'sent')
-            logger.info(f"One-time reminder {reminder_id} marked as sent")
-
-        logger.info(f"Reminder {reminder_id} sent to user {user_id}")
-
     except Forbidden as e:
         # User blocked the bot - cancel the reminder to stop infinite retries
         update_reminder_status(reminder_id, 'cancelled')
@@ -338,19 +396,31 @@ async def send_reminder(bot: Bot, reminder: dict):
             f"User {user_id} blocked the bot - reminder {reminder_id} cancelled: {e}"
         )
 
+    except BadRequest as e:
+        # Telegram rejected the request itself (e.g. chat not found): retrying cannot help
+        await _give_up_on_reminder(bot, reminder, f"permanent Telegram error: {e}")
+
     except (NetworkError, TimedOut) as e:
-        logger.warning(f"Network error sending reminder {reminder_id} to user {user_id}: {e}")
-        # Don't update status - will retry next time
+        await _record_failed_attempt(bot, reminder, e)
 
     except TelegramError as e:
-        # Other Telegram error (user blocked bot, invalid chat, etc.)
         logger.error(f"Telegram error sending reminder {reminder_id} to user {user_id}: {e}")
-        # Don't update status - will retry next time
+        await _record_failed_attempt(bot, reminder, e)
 
     except Exception as e:
-        # Unexpected error
         logger.error(f"Unexpected error sending reminder {reminder_id} to user {user_id}: {e}", exc_info=True)
-        # Don't update status - will retry next time
+        await _record_failed_attempt(bot, reminder, e)
+
+    else:
+        # Delivered: move the reminder forward outside the send try, so a
+        # bookkeeping error is not counted as a failed delivery attempt
+        try:
+            _advance_reminder(reminder)
+        except Exception as e:
+            # Never leave a delivered reminder pending: it would be sent again every minute
+            logger.error(f"Could not reschedule reminder {reminder_id} after delivery, closing it: {e}", exc_info=True)
+            update_reminder_status(reminder_id, 'sent')
+        logger.info(f"Reminder {reminder_id} sent to user {user_id}")
 
 
 def start_scheduler(bot: Bot):
@@ -375,6 +445,16 @@ def start_scheduler(bot: Bot):
         args=[bot],
         id='check_reminders',
         name='Check and send pending reminders',
+        replace_existing=True
+    )
+
+    # Add job to announce recovery after Telegram polling failures
+    scheduler.add_job(
+        check_polling_health,
+        trigger=IntervalTrigger(minutes=1),
+        args=[bot],
+        id='check_polling_health',
+        name='Check Telegram polling health',
         replace_existing=True
     )
 

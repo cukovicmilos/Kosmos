@@ -135,6 +135,25 @@ def migrate_challenge_columns(cursor):
     logger.info("Challenge columns migration completed")
 
 
+def migrate_retry_columns(cursor):
+    """
+    Migration function to add delivery retry counter to existing reminders table.
+    Checks if columns exist before adding them to prevent errors.
+    """
+    logger.info("Checking for retry columns migration...")
+
+    cursor.execute("PRAGMA table_info(reminders)")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+
+    if 'retry_count' not in existing_columns:
+        cursor.execute("ALTER TABLE reminders ADD COLUMN retry_count INTEGER DEFAULT 0")
+        logger.info("Added column 'retry_count' to reminders table")
+    else:
+        logger.debug("Column 'retry_count' already exists, skipping")
+
+    logger.info("Retry columns migration completed")
+
+
 def init_database():
     """
     Initialize database and create tables if they don't exist.
@@ -211,6 +230,9 @@ def init_database():
 
         # Run migrations for challenges feature
         migrate_challenge_columns(cursor)
+
+        # Run migrations for delivery retry limit
+        migrate_retry_columns(cursor)
 
         logger.info("Database initialized successfully")
 
@@ -538,9 +560,35 @@ def update_reminder_status(reminder_id: int, status: str) -> bool:
         return False
 
 
+def increment_reminder_retry(reminder_id: int) -> int:
+    """
+    Record one failed delivery attempt for a reminder.
+
+    Args:
+        reminder_id: Reminder ID
+
+    Returns:
+        Total failed attempts for this scheduled time (0 if reminder not found)
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE reminders SET retry_count = COALESCE(retry_count, 0) + 1 WHERE id = ?",
+                (reminder_id,)
+            )
+            cursor.execute("SELECT retry_count FROM reminders WHERE id = ?", (reminder_id,))
+            row = cursor.fetchone()
+            return row['retry_count'] if row else 0
+    except Exception as e:
+        logger.error(f"Error incrementing retry count for reminder {reminder_id}: {e}")
+        return 0
+
+
 def update_reminder_time(reminder_id: int, new_scheduled_time: datetime) -> bool:
     """
     Update reminder scheduled time (for postpone feature).
+    Resets the delivery retry counter, since this is a new scheduled time.
 
     Args:
         reminder_id: Reminder ID
@@ -554,7 +602,7 @@ def update_reminder_time(reminder_id: int, new_scheduled_time: datetime) -> bool
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE reminders
-                SET scheduled_time = ?, status = 'pending'
+                SET scheduled_time = ?, status = 'pending', retry_count = 0
                 WHERE id = ?
             """, (new_scheduled_time, reminder_id))
             updated = cursor.rowcount > 0
@@ -616,6 +664,7 @@ def update_reminder(
             if scheduled_time is not None:
                 updates.append("scheduled_time = ?")
                 updates.append("status = 'pending'")  # Reset status when time changes
+                updates.append("retry_count = 0")
                 params.append(scheduled_time)
 
             params.append(reminder_id)

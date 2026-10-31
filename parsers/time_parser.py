@@ -229,13 +229,18 @@ def get_next_weekday(target_weekday: int, current_time: datetime) -> datetime:
     return current_time + timedelta(days=days_ahead)
 
 
-def parse_reminder(message: str, user_timezone: str = "Europe/Belgrade") -> Optional[Tuple[str, datetime]]:
+def parse_reminder(
+    message: str,
+    user_timezone: str = "Europe/Belgrade",
+    now: Optional[datetime] = None,
+) -> Optional[Tuple[str, datetime]]:
     """
     Parse reminder message and extract text and scheduled time.
 
     Args:
         message: User's message (e.g., "Kafa sutra 14:00")
         user_timezone: User's timezone
+        now: Optional current time override (timezone-aware or naive local)
 
     Returns:
         Tuple of (reminder_text, scheduled_datetime) or None if parsing fails
@@ -252,7 +257,12 @@ def parse_reminder(message: str, user_timezone: str = "Europe/Belgrade") -> Opti
         tz = pytz.timezone("Europe/Belgrade")
 
     # Current time in user's timezone
-    now = datetime.now(tz)
+    if now is None:
+        now = datetime.now(tz)
+    elif now.tzinfo is None:
+        now = tz.localize(now)
+    else:
+        now = now.astimezone(tz)
 
     # Try to parse the message
     # Strategy: Look for time at the end of the message
@@ -655,7 +665,7 @@ def parse_reminders(
     if dual:
         return dual
 
-    single = parse_reminder(message, user_timezone)
+    single = parse_reminder(message, user_timezone, now=current)
     if single:
         return [single]
     return None

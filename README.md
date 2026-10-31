@@ -80,6 +80,8 @@ When a reminder arrives, you can postpone it with:
 - Quick actions: 15 min, 30 min, 1h, 3h, 1 day
 - Custom time: Choose "Drugo vreme" / "Custom time" and enter specific time (e.g., `19:00` or `tue 14:00`)
 
+If a reminder can't be delivered (for example, Telegram is unreachable for a long time), the bot keeps retrying about once a minute for roughly two hours. If it still fails, you get a message saying the reminder was not delivered. A recurring reminder skips only that occurrence and continues on its schedule.
+
 ### Commands
 
 - `/start` - Initialize the bot and show keyboard buttons
@@ -166,6 +168,8 @@ pip install -r requirements.txt
 cp .env.example .env
 nano .env  # Add your BOT_TOKEN
 ```
+
+Optional: set `ADMIN_CHAT_ID` to your Telegram user ID. The bot then messages you when it starts, and when it loses its connection to Telegram for several polls in a row, and again when the connection is back.
 
 ### 4. Run
 

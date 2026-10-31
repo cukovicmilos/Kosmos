@@ -22,6 +22,7 @@ from database import init_database
 from handlers import start, help as help_handler, reminder, postpone, list_handler, settings, recurring, quick, challenge
 from handlers import calendar as calendar_handler
 from scheduler import start_scheduler
+from alerts import notify_admin, on_error
 
 # Try to import bot_stats for initial description update
 try:
@@ -52,6 +53,8 @@ async def post_init(application: Application) -> None:
     ]
     await application.bot.set_my_commands(commands)
     logger.info("Bot commands registered")
+
+    await notify_admin(application.bot, "✅ Kosmos bot je pokrenut.")
 
     # Update bot descriptions with statistics on startup
     if BOT_STATS_AVAILABLE:
@@ -102,6 +105,8 @@ def main():
     calendar_handler.register_handlers(application)  # /kalendar calendar picker conversation
     postpone.register_handlers(application)  # Register postpone callbacks
     reminder.register_handlers(application)  # Must be last (catches all text messages)
+
+    application.add_error_handler(on_error)  # Telegram polling failures and unhandled errors
 
     logger.info("All handlers registered successfully!")
 
