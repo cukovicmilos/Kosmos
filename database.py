@@ -151,6 +151,14 @@ def migrate_retry_columns(cursor):
     else:
         logger.debug("Column 'retry_count' already exists, skipping")
 
+    if 'timeout_count' not in existing_columns:
+        cursor.execute("ALTER TABLE reminders ADD COLUMN timeout_count INTEGER DEFAULT 0")
+        logger.info("Added column 'timeout_count' to reminders table")
+
+    if 'retry_after' not in existing_columns:
+        cursor.execute("ALTER TABLE reminders ADD COLUMN retry_after TIMESTAMP")
+        logger.info("Added column 'retry_after' to reminders table")
+
     logger.info("Retry columns migration completed")
 
 
@@ -508,6 +516,11 @@ def get_pending_reminders() -> List[Dict[str, Any]]:
             due_reminders = []
             for row in rows:
                 reminder = dict(row)
+
+                # Timed-out sends wait before the single retry (see scheduler._record_failed_attempt)
+                if reminder.get('retry_after') and parse_db_datetime(reminder['retry_after']) > datetime.now():
+                    continue
+
                 user_timezone = reminder.get('timezone', 'Europe/Belgrade')
 
                 try:
@@ -585,6 +598,27 @@ def increment_reminder_retry(reminder_id: int) -> int:
         return 0
 
 
+def mark_reminder_timed_out(reminder_id: int, retry_after: datetime) -> None:
+    """
+    Record a send that timed out. Telegram may already have delivered it, so the
+    next send is held until retry_after and any failure after that gives up.
+
+    Args:
+        reminder_id: Reminder ID
+        retry_after: Earliest time for the next send attempt
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE reminders
+                SET timeout_count = COALESCE(timeout_count, 0) + 1, retry_after = ?
+                WHERE id = ?
+            """, (retry_after, reminder_id))
+    except Exception as e:
+        logger.error(f"Error marking reminder {reminder_id} as timed out: {e}")
+
+
 def update_reminder_time(reminder_id: int, new_scheduled_time: datetime) -> bool:
     """
     Update reminder scheduled time (for postpone feature).
@@ -602,7 +636,8 @@ def update_reminder_time(reminder_id: int, new_scheduled_time: datetime) -> bool
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE reminders
-                SET scheduled_time = ?, status = 'pending', retry_count = 0
+                SET scheduled_time = ?, status = 'pending', retry_count = 0,
+                    timeout_count = 0, retry_after = NULL
                 WHERE id = ?
             """, (new_scheduled_time, reminder_id))
             updated = cursor.rowcount > 0
@@ -665,6 +700,8 @@ def update_reminder(
                 updates.append("scheduled_time = ?")
                 updates.append("status = 'pending'")  # Reset status when time changes
                 updates.append("retry_count = 0")
+                updates.append("timeout_count = 0")
+                updates.append("retry_after = NULL")
                 params.append(scheduled_time)
 
             params.append(reminder_id)

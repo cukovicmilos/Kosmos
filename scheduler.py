@@ -21,6 +21,7 @@ from database import (
     update_reminder_status,
     update_reminder_time,
     increment_reminder_retry,
+    mark_reminder_timed_out,
     parse_db_datetime,
 )
 from i18n import get_text
@@ -29,6 +30,9 @@ from challenge_utils import challenge_elapsed_days, build_challenge_message
 from message_queue import process_pending_messages, cleanup_old_messages
 
 logger = logging.getLogger(__name__)
+
+# A timed-out send may have reached the user, so its single retry waits this long
+TIMEOUT_RETRY_DELAY = timedelta(minutes=5)
 
 # Import bot_stats functions (imported here to avoid circular dependencies)
 try:
@@ -297,15 +301,24 @@ async def _give_up_on_reminder(bot: Bot, reminder: dict, reason: str):
         logger.warning(f"Could not notify user {user_id} about undelivered reminder {reminder_id}: {e}")
 
 
-async def _record_failed_attempt(bot: Bot, reminder: dict, error: Exception):
+async def _record_failed_attempt(bot: Bot, reminder: dict, error: Exception, timed_out: bool = False):
     """
     Count a failed send attempt and give up once the retry limit is reached.
     The scheduler runs every minute, so the limit is roughly a number of minutes.
+
+    A timeout does not prove the message was not delivered, so after one timeout
+    the reminder gets a single retry after TIMEOUT_RETRY_DELAY. Any failure after
+    that gives up, so the user does not get the same reminder over and over.
     """
     reminder_id = reminder['id']
     attempts = increment_reminder_retry(reminder_id)
 
-    if attempts >= REMINDER_MAX_RETRIES:
+    if reminder.get('timeout_count', 0):
+        await _give_up_on_reminder(bot, reminder, f"failed again after a timeout, last error: {error}")
+    elif timed_out:
+        mark_reminder_timed_out(reminder_id, datetime.now() + TIMEOUT_RETRY_DELAY)
+        logger.warning(f"Reminder {reminder_id} timed out, retrying once in 5 min: {error}")
+    elif attempts >= REMINDER_MAX_RETRIES:
         await _give_up_on_reminder(bot, reminder, f"{attempts} failed attempts, last error: {error}")
     else:
         logger.warning(
@@ -400,7 +413,10 @@ async def send_reminder(bot: Bot, reminder: dict):
         # Telegram rejected the request itself (e.g. chat not found): retrying cannot help
         await _give_up_on_reminder(bot, reminder, f"permanent Telegram error: {e}")
 
-    except (NetworkError, TimedOut) as e:
+    except TimedOut as e:
+        await _record_failed_attempt(bot, reminder, e, timed_out=True)
+
+    except NetworkError as e:
         await _record_failed_attempt(bot, reminder, e)
 
     except TelegramError as e:

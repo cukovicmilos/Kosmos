@@ -82,6 +82,8 @@ When a reminder arrives, you can postpone it with:
 
 If a reminder can't be delivered (for example, Telegram is unreachable for a long time), the bot keeps retrying about once a minute for roughly two hours. If it still fails, you get a message saying the reminder was not delivered. A recurring reminder skips only that occurrence and continues on its schedule.
 
+If a send times out, Telegram may still have delivered it, so the bot waits 5 minutes and tries once more. If that attempt fails too, the reminder is marked as not delivered instead of being sent again and again.
+
 ### Commands
 
 - `/start` - Initialize the bot and show keyboard buttons

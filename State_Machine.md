@@ -247,14 +247,20 @@ stateDiagram-v2
     CheckPending --> [*]: No reminders
 
     SendReminder --> NetworkSuccess: Message sent
-    SendReminder --> NetworkError: Timeout/Failure/Other error
+    SendReminder --> TimedOut: TimedOut (message may have been delivered)
+    SendReminder --> NetworkError: Failure/Other error
     SendReminder --> PermanentError: BadRequest (e.g. chat not found)
     SendReminder --> Blocked: Forbidden (user blocked bot)
 
     NetworkSuccess --> CheckRecurring: Reminder sent
-    NetworkError --> CountAttempt: Increment retry_count
+    TimedOut --> CountAttempt: Increment retry_count, timeout_count = 1
+    NetworkError --> AfterTimeout: Prior timeout_count > 0
+    NetworkError --> CountAttempt: No prior timeout
+    AfterTimeout --> GiveUp: Retry after timeout failed
+    CountAttempt --> [*]: Timed out: hold until retry_after (+5 min), retry once
     CountAttempt --> [*]: retry_count below REMINDER_MAX_RETRIES (retry next cycle)
     CountAttempt --> GiveUp: retry_count reached REMINDER_MAX_RETRIES
+    TimedOut --> GiveUp: Prior timeout_count > 0 (second timeout)
     PermanentError --> GiveUp
     Blocked --> [*]: Status 'cancelled', no notification
 
@@ -279,7 +285,9 @@ stateDiagram-v2
 - **CheckPending**: Query database for due reminders (every minute)
 - **SendReminder**: Send notification to user with postpone options
 - **NetworkSuccess**: Message delivered successfully
-- **NetworkError**: Network timeout, delivery failure or unexpected error. Counted in `reminders.retry_count`
+- **TimedOut**: Telegram request timed out. The message may already have reached the user, so this is handled separately from other errors
+- **NetworkError**: Delivery failure (e.g. `Bad Gateway`) or unexpected error. Counted in `reminders.retry_count`
+- **AfterTimeout**: A failure after an earlier timeout (`timeout_count > 0`); the single retry failed, so give up
 - **CountAttempt**: Increment `retry_count` (one attempt per scheduler run, every minute)
 - **PermanentError**: Telegram rejected the request (`BadRequest`); retrying cannot succeed, so give up at once
 - **Blocked**: User blocked the bot; reminder is cancelled
@@ -310,6 +318,14 @@ This ensures reminders fire at the correct time regardless of server timezone.
 
 **Retry Limit:**
 Failed sends increment `reminders.retry_count`. When it reaches `REMINDER_MAX_RETRIES` (default 120, env-configurable, roughly two hours at one attempt per minute) the reminder gives up as described above. `retry_count` is reset to 0 whenever the scheduled time changes (postpone, edit time, recurring reschedule), so each new occurrence gets a fresh budget.
+
+**Timeout Handling:**
+A `TimedOut` send may have reached Telegram even though the bot got no response, so resending every minute can deliver the same reminder several times. Instead:
+1. First timeout: set `timeout_count = 1` and `retry_after = now + 5 min` (`TIMEOUT_RETRY_DELAY`). `get_pending_reminders` skips the reminder until `retry_after` passes.
+2. Retry after the hold: if it succeeds, the reminder is closed as usual.
+3. Any failure after a timeout (second timeout, `Bad Gateway`, etc.) gives up immediately and sends the "could not deliver" notice.
+
+Postpone and edit-time reset `timeout_count` to 0 and clear `retry_after`. Errors that are not timeouts (e.g. `Bad Gateway`) keep the per-minute retry from the retry limit above.
 
 **Challenge Rendering:**
 For reminders with `is_challenge=1`, the notification text is generated dynamically at send time (progress bar + `total/elapsed` counter based on `challenge_start_date` and current date in the user's timezone) instead of using the static `message_text`. Challenge notifications show only a delete button (no postpone options). Rescheduling and end-date handling are the same as for regular daily recurring reminders.

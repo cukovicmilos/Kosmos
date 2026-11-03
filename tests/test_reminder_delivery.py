@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("BOT_TOKEN", "123456:test-token")
 
 import pytz  # noqa: E402
-from telegram.error import BadRequest, Forbidden, NetworkError  # noqa: E402
+from telegram.error import BadRequest, Forbidden, NetworkError, TimedOut  # noqa: E402
 
 import database  # noqa: E402
 from database import (  # noqa: E402
@@ -240,6 +240,79 @@ class ReminderRetryTests(DeliveryTestCase):
         update_reminder(rid, message_text="Take meds with food")
 
         self.assertEqual(get_reminder_by_id(rid)["retry_count"], 1)
+
+    def expire_retry_hold(self, rid):
+        import sqlite3
+
+        conn = sqlite3.connect(self.db_file)
+        conn.execute(
+            "UPDATE reminders SET retry_after = ? WHERE id = ?",
+            (datetime.now() - timedelta(minutes=1), rid),
+        )
+        conn.commit()
+        conn.close()
+
+    def test_timeout_holds_reminder_then_retries_once(self):
+        rid = self.make_due_reminder()
+        self.bot.always_raise = TimedOut("timed out")
+        self.attempt(rid)
+
+        row = get_reminder_by_id(rid)
+        self.assertEqual(row["status"], "pending")
+        self.assertEqual(row["timeout_count"], 1)
+        self.assertIsNone(self.due(rid), "timed-out send must wait before retrying")
+
+        self.expire_retry_hold(rid)
+        self.bot.always_raise = None
+        self.attempt(rid)
+
+        self.assertEqual(get_reminder_by_id(rid)["status"], "sent")
+        self.assertEqual(len(self.bot.sent), 1)
+
+    def test_second_timeout_gives_up_and_notifies(self):
+        rid = self.make_due_reminder()
+        self.bot.always_raise = TimedOut("timed out")
+        self.attempt(rid)
+        self.expire_retry_hold(rid)
+        self.bot.always_raise = None
+        self.bot.raise_next = [TimedOut("timed out")]
+        self.attempt(rid)
+
+        self.assertEqual(get_reminder_by_id(rid)["status"], "failed")
+        self.assertEqual(len(self.bot.sent), 1)
+        self.assertIn("couldn't deliver", self.bot.sent[0]["text"])
+
+    def test_network_error_after_timeout_gives_up(self):
+        rid = self.make_due_reminder()
+        self.bot.always_raise = TimedOut("timed out")
+        self.attempt(rid)
+        self.expire_retry_hold(rid)
+        self.bot.always_raise = NetworkError("Bad Gateway")
+        self.attempt(rid)
+
+        self.assertEqual(get_reminder_by_id(rid)["status"], "failed")
+
+    def test_network_error_without_timeout_keeps_retrying(self):
+        rid = self.make_due_reminder()
+        self.bot.always_raise = NetworkError("Bad Gateway")
+        self.attempt(rid)
+
+        row = get_reminder_by_id(rid)
+        self.assertEqual(row["status"], "pending")
+        self.assertIsNone(row["retry_after"])
+        self.assertIsNotNone(self.due(rid))
+
+    def test_postpone_clears_timeout_hold(self):
+        rid = self.make_due_reminder()
+        self.bot.always_raise = TimedOut("timed out")
+        self.attempt(rid)
+
+        future = datetime.now(BELGRADE).replace(tzinfo=None) + timedelta(hours=1)
+        update_reminder_time(rid, future)
+
+        row = get_reminder_by_id(rid)
+        self.assertEqual(row["timeout_count"], 0)
+        self.assertIsNone(row["retry_after"])
 
 
 class MigrationTests(DeliveryTestCase):
